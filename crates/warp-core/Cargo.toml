@@ -1,0 +1,15 @@
+[package]
+name = "warp-core"
+version.workspace = true
+edition.workspace = true
+license-file.workspace = true
+authors.workspace = true
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+bitflags.workspace = true
+compact_str.workspace = true
+async-trait.workspace = true
+thiserror.workspace = true
+tokio.workspace = true

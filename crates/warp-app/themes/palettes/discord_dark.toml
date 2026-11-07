@@ -1,0 +1,22 @@
+id = "discord_dark"
+name = "Discord Onyx Dark"
+font_family = "gg sans"
+font_size_base = 14
+font_size_small = 11
+
+bg_primary = "#313338"
+bg_secondary = "#2B2D31"
+bg_tertiary = "#1E1F22"
+bg_elevated = "#383A40"
+bubble_outgoing = "#3B4252"
+bubble_incoming = "#2B2D31"
+text_primary = "#F2F3F5"
+text_secondary = "#949BA4"
+text_muted = "#6D6F78"
+accent_primary = "#5865F2"
+accent_secondary = "#4752C4"
+border_subtle = "#232428"
+status_online = "#23A55A"
+status_warning = "#F0B232"
+status_danger = "#F23F43"
+surface_opacity = 1.0

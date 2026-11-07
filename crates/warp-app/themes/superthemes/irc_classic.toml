@@ -1,0 +1,15 @@
+id = "irc_classic"
+name = "IRCv3 Bouncer Dense"
+description = "Ultra-dense server/network rail with flat monospaced-friendly rows and inline timestamps."
+
+navigation_layout = "DiscordServerRail"
+message_layout = "CompactFlatRows"
+reaction_style = "BelowMessagePills"
+
+enable_swipe_to_reply = false
+show_protocol_badge = true
+compact_timestamps = true
+sidebar_width_px = 230
+server_rail_width_px = 56
+bubble_corner_radius_px = 4
+avatar_size_px = 28

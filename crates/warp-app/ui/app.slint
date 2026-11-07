@@ -1,0 +1,3341 @@
+/*
+ * Personal and Educational Free License (PEF License / PEFL)
+ * Version 1.0 - 2026-05-26
+ * Copyright (c) 2026 Rubens Rainelli
+ *
+ * Contact Details:
+ *   Email: rubens@rainelli.it
+ *   GitHub: https://github.com/RubensRainelli/
+ *   Tel: (+39) 342 811 5882
+ *
+ * Personal and educational free use permitted.
+ * Corporate, business or enterprise use prohibited without written authorization and fee.
+ * The full license can be found in the LICENSE file.
+ */
+
+import { ScrollView } from "std-widgets.slint";
+import {
+    ThemePalette,
+    SuperTheme,
+    NavigationLayout,
+    MessageLayout,
+    ReactionStyle,
+    UiProtocolToggleItem,
+    UiAccountItem,
+    UiFolderTabItem,
+    UiServerRailItem,
+    UiChatListItem,
+    UiMessageItem,
+    UiActiveChatCapabilities,
+    UiAuthFieldItem
+} from "globals.slint";
+import { PolymorphicNavigation } from "navigation.slint";
+import { PolymorphicChatViewport } from "chat_viewport.slint";
+
+export {
+    ThemePalette,
+    SuperTheme,
+    NavigationLayout,
+    MessageLayout,
+    ReactionStyle,
+    UiProtocolToggleItem,
+    UiAccountItem,
+    UiFolderTabItem,
+    UiServerRailItem,
+    UiChatListItem,
+    UiMessageItem,
+    UiActiveChatCapabilities,
+    UiAuthFieldItem
+}
+
+export component MainWindow inherits Window {
+    title: "Warp IM — Universal Native Multi-Protocol Messenger (PEFL v1.0 - Rubens Rainelli)";
+    preferred-width: 1280px;
+    preferred-height: 820px;
+    background: ThemePalette.bg-primary;
+
+    // Protocol Toggles (User can enable/disable any of the 8 protocols at runtime)
+    in-out property <[UiProtocolToggleItem]> protocol-toggles: [];
+
+    // Multi-Account & Chat List Isolation Mode ("unified", "per_protocol", "per_account", "hybrid_custom")
+    in-out property <string> isolation-mode: "unified";
+    in-out property <string> active-account-id: "tg_main";
+    in-out property <string> active-protocol-filter: "telegram";
+    in-out property <[UiAccountItem]> accounts: [];
+    in-out property <[UiAccountItem]> account-items <=> root.accounts;
+
+    // Navigation & Chat Models
+    in-out property <[UiFolderTabItem]> folder-tabs: [];
+    in-out property <string> active-folder-id: "all";
+    in-out property <[UiServerRailItem]> server-rail: [];
+    in-out property <string> active-container-uri: "";
+    in-out property <[UiChatListItem]> chats: [];
+    in-out property <string> active-chat-uri: "";
+
+    // Resizable Desktop Panel Widths (`col-resize` interactive splitters)
+    in-out property <length> user-chat-list-width: 340px;
+    in-out property <length> user-channel-tree-width: 240px;
+
+    // Search, Quick Contact & Pin State
+    in-out property <string> search-query: "";
+    in-out property <string> quick-contact-id: "";
+    in-out property <string> pinned-chat-uri: "";
+    in-out property <bool> active-chat-is-pinned: false;
+    in-out property <string> status-toast-text: "";
+
+    // Active Chat Viewport Models
+    in-out property <string> active-chat-title: "Seleziona una conversazione";
+    in-out property <string> active-chat-subtitle: "";
+    in-out property <string> active-chat-protocol-badge: "WARP";
+    in-out property <UiActiveChatCapabilities> active-chat-capabilities: {
+        can-send-messages: true,
+        can-edit: true,
+        can-edit-only-last: false,
+        can-delete-for-all: true,
+        can-react: true,
+        can-reply-quote: true,
+        can-pin: true,
+        can-send-voice: true,
+        can-upload-files: true,
+        supports-threads: false,
+        is-e2ee-active: false,
+        is-read-only: false,
+    };
+    in-out property <[UiMessageItem]> messages: [];
+
+    // Composer & Reply / Edit State
+    in-out property <bool> send-on-enter: true;
+    in-out property <string> composer-text: "";
+    in-out property <string> replying-to-message-id: "";
+    in-out property <string> reply-to-preview: "";
+    in-out property <string> editing-message-id: "";
+    in-out property <string> editing-message-preview: "";
+
+    // Dedicated Settings Modal (`Impostazioni`)
+    in-out property <bool> show-settings-modal: false;
+
+    // New Chat / Join Channel Modal (`+ Nuova Chat`)
+    in-out property <bool> show-new-chat-modal: false;
+    in-out property <string> new-chat-account-id: "tg_main";
+    in-out property <string> new-chat-title: "";
+    in-out property <string> new-chat-remote-target: "";
+    in-out property <string> new-chat-recipient <=> root.new-chat-remote-target;
+    in-out property <bool> new-chat-is-group: false;
+
+    // Welcome & Onboarding / Demo Mockup Overlay
+    in-out property <bool> show-welcome-screen: false;
+    in-out property <bool> is-demo-mockup-active: false;
+
+    // 3-Step Account Onboarding:
+    // Step 1: "+ Aggiungi un Account" button -> opens Step 2 (`show-protocol-picker-modal`)
+    // Step 2: "Lista con i protocolli" (`show-protocol-picker-modal`) -> opens Step 3 (`show-auth-modal`)
+    // Step 3: "Apre il modale del protocollo per il login" (`show-auth-modal`)
+    in-out property <bool> show-protocol-picker-modal: false;
+
+    // Declarative Onboarding Modal (`AuthFlowDescriptor` Login / Sign-Up / Bot Token)
+    in-out property <bool> show-auth-modal: false;
+    in-out property <string> auth-modal-protocol: "Telegram";
+    in-out property <string> auth-modal-mode: "login";
+    in-out property <bool> auth-modal-supports-signup: false;
+    in-out property <bool> auth-modal-supports-bot-login: true;
+    in-out property <string> auth-modal-title: "";
+    in-out property <string> auth-modal-description: "";
+    in-out property <string> auth-modal-qr-hint: "";
+    in-out property <string> auth-modal-status-text: "";
+    in-out property <[UiAuthFieldItem]> auth-modal-fields: [];
+
+    // PEFL v1.0 Clause 3 Mandatory Foreground EULA State
+    in-out property <bool> show-pefl-eula-modal: true;
+    in-out property <string> pefl-license-lang: "IT";
+    in-out property <string> pefl-license-text: "";
+    in-out property <bool> pefl-remember-7-days: true;
+
+    // Telegram Backend Environment Selector ("public" vs "test_dc2")
+    in-out property <string> telegram-backend-mode: "public";
+
+    // Internal swipe-back tracking & keyboard height calculation
+    private property <bool> global-edge-swipe-triggered: false;
+    property <length> active-keyboard-inset: (SuperTheme.is-mobile-compact && SuperTheme.mobile-keyboard-open)
+        ? (196px + SuperTheme.safe-area-bottom)
+        : 0px;
+
+    // Callbacks to Rust UI Bridge (existing + new)
+    callback switch-supertheme(string);
+    callback switch-palette(string);
+    callback toggle-protocol(string, bool);
+    callback switch-isolation-mode(string);
+    callback switch-telegram-backend-mode(string);
+    callback select-account(string);
+    callback toggle-account-enabled(string, bool);
+    callback remove-account(string);
+    callback toggle-mobile-form-factor();
+    callback mobile-navigate-back();
+    callback select-folder(string);
+    callback select-container(string);
+    callback select-chat(string);
+    callback send-message(string);
+    callback send-attachment(string);
+    callback clear-chat-history();
+    callback delete-active-chat();
+    callback react-message(string, string);
+    callback react-to-message(string, string);
+    callback delete-message(string);
+    callback edit-message(string);
+    callback reply-to-message(string);
+    callback start-edit-message(string, string);
+    callback commit-edit-message(string, string);
+    callback cancel-reply-or-edit();
+    callback search-query-edited(string);
+    callback quick-add-contact(string);
+    callback toggle-pin-active-chat();
+    callback toggle-send-on-enter(bool);
+    callback open-settings-modal();
+    callback open-new-chat-modal();
+    callback create-new-chat(string, string, string, bool);
+    callback activate-demo-mockup();
+    callback exit-demo-mockup();
+    callback inspect-protocol-auth(string);
+    callback switch-auth-modal-mode(string);
+    callback update-auth-field(string, string);
+    callback submit-auth-modal();
+    callback accept-pefl-eula(bool);
+    callback decline-pefl-eula();
+    callback switch-pefl-lang(string);
+
+    function handle-back-navigation() {
+        if (SuperTheme.mobile-keyboard-open) {
+            SuperTheme.hide-soft-keyboard();
+        } else if (root.show-auth-modal) {
+            root.show-auth-modal = false;
+            root.show-protocol-picker-modal = true;
+        } else if (root.show-protocol-picker-modal) {
+            root.show-protocol-picker-modal = false;
+        } else if (root.show-settings-modal) {
+            root.show-settings-modal = false;
+        } else if (root.show-new-chat-modal) {
+            root.show-new-chat-modal = false;
+        } else if (root.show-welcome-screen && (root.accounts.length > 0 || root.is-demo-mockup-active)) {
+            root.show-welcome-screen = false;
+        } else if (SuperTheme.is-mobile-compact && SuperTheme.mobile-showing-chat) {
+            root.mobile-navigate-back();
+        }
+    }
+
+    // =========================================================================
+    // 1. Main Workspace Wrapped in Top & Bottom Safe-Area Insets
+    //    (Never covered by Android Notification Bar or Gesture Navigation Bar!)
+    // =========================================================================
+    VerticalLayout {
+        width: 100%;
+        height: 100%;
+        spacing: 0px;
+
+        // Top Safe-Area Spacer (Android Status / Notification Bar)
+        Rectangle {
+            height: SuperTheme.safe-area-top;
+            background: ThemePalette.bg-secondary;
+        }
+
+        // Main Workspace Split-Pane (Desktop) / Single-Pane (Mobile)
+        HorizontalLayout {
+            vertical-stretch: 1;
+            spacing: 0px;
+
+            // Left Chat List / Server Rail Sidebar
+            if !SuperTheme.is-mobile-compact || !SuperTheme.mobile-showing-chat : PolymorphicNavigation {
+                horizontal-stretch: SuperTheme.is-mobile-compact ? 1 : 0;
+                custom-chat-list-width: root.user-chat-list-width;
+                custom-channel-tree-width: root.user-channel-tree-width;
+                folder-tabs: root.folder-tabs;
+                active-folder-id: root.active-folder-id;
+                server-rail: root.server-rail;
+                active-container-uri: root.active-container-uri;
+                chats: root.chats;
+                active-chat-uri: root.active-chat-uri;
+                accounts: root.accounts;
+                active-account-id: root.active-account-id;
+                isolation-mode: root.isolation-mode;
+                pinned-chat-uri: root.pinned-chat-uri;
+                is-demo-mockup-active: root.is-demo-mockup-active;
+                search-query <=> root.search-query;
+                quick-contact-id <=> root.quick-contact-id;
+
+                select-folder(id) => { root.select-folder(id); }
+                select-container(uri) => { root.select-container(uri); }
+                select-chat(uri) => { root.select-chat(uri); }
+                select-account(id) => { root.select-account(id); }
+                search-query-edited(q) => { root.search-query-edited(q); }
+                quick-add-contact(id) => { root.quick-add-contact(id); }
+                open-protocol-picker() => {
+                    root.show-protocol-picker-modal = true;
+                }
+                open-onboarding-for(slug) => {
+                    root.inspect-protocol-auth(slug);
+                    root.show-auth-modal = true;
+                }
+                open-settings-modal() => {
+                    root.show-settings-modal = true;
+                    root.open-settings-modal();
+                }
+                open-new-chat-modal() => {
+                    root.new-chat-account-id = root.active-account-id;
+                    root.show-new-chat-modal = true;
+                    root.open-new-chat-modal();
+                }
+                exit-demo-mockup() => {
+                    root.is-demo-mockup-active = false;
+                    root.show-welcome-screen = true;
+                    root.exit-demo-mockup();
+                }
+            }
+
+            // Desktop Interactive Resizable Vertical Splitter (`6px` wide, `mouse-cursor: col-resize`)
+            if !SuperTheme.is-mobile-compact : Rectangle {
+                width: 6px;
+                background: splitter-touch.has-hover || splitter-touch.pressed
+                    ? ThemePalette.accent-primary
+                    : ThemePalette.border-subtle;
+
+                // Subtle center grip indicator
+                Rectangle {
+                    width: 2px;
+                    height: 36px;
+                    x: 2px;
+                    y: (parent.height - self.height) / 2;
+                    border-radius: 1px;
+                    background: splitter-touch.has-hover || splitter-touch.pressed
+                        ? #FFFFFF
+                        : ThemePalette.text-muted;
+                }
+
+                splitter-touch := TouchArea {
+                    mouse-cursor: col-resize;
+                    moved => {
+                        if (self.pressed) {
+                            if (SuperTheme.nav-layout == NavigationLayout.VerticalServerRail) {
+                                root.user-channel-tree-width = Math.clamp(
+                                    root.user-channel-tree-width + (self.mouse-x - self.pressed-x),
+                                    180px,
+                                    460px
+                                );
+                            } else {
+                                root.user-chat-list-width = Math.clamp(
+                                    root.user-chat-list-width + (self.mouse-x - self.pressed-x),
+                                    240px,
+                                    540px
+                                );
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Right Chat Viewport
+            if !SuperTheme.is-mobile-compact || SuperTheme.mobile-showing-chat : PolymorphicChatViewport {
+                horizontal-stretch: 1;
+                vertical-stretch: 1;
+                active-chat-title: root.active-chat-title;
+                active-chat-subtitle: root.active-chat-subtitle;
+                active-chat-protocol-badge: root.active-chat-protocol-badge;
+                is-active-chat-pinned: root.active-chat-is-pinned || (root.pinned-chat-uri != "" && root.pinned-chat-uri == root.active-chat-uri);
+                send-on-enter: root.send-on-enter;
+                capabilities: root.active-chat-capabilities;
+                messages: root.messages;
+                composer-text <=> root.composer-text;
+                replying-to-message-id <=> root.replying-to-message-id;
+                reply-to-preview <=> root.reply-to-preview;
+                editing-message-id <=> root.editing-message-id;
+                editing-message-preview <=> root.editing-message-preview;
+
+                navigate-back() => {
+                    root.mobile-navigate-back();
+                }
+                toggle-pin-active-chat() => {
+                    if (root.pinned-chat-uri == root.active-chat-uri) {
+                        root.pinned-chat-uri = "";
+                        root.active-chat-is-pinned = false;
+                    } else {
+                        root.pinned-chat-uri = root.active-chat-uri;
+                        root.active-chat-is-pinned = true;
+                    }
+                    root.toggle-pin-active-chat();
+                }
+                clear-chat-history() => {
+                    root.clear-chat-history();
+                }
+                delete-active-chat() => {
+                    root.delete-active-chat();
+                }
+                open-new-chat-modal() => {
+                    root.new-chat-account-id = root.active-account-id;
+                    root.show-new-chat-modal = true;
+                    root.open-new-chat-modal();
+                }
+                open-settings-modal() => {
+                    root.show-settings-modal = true;
+                    root.open-settings-modal();
+                }
+                send-message(txt) => { root.send-message(txt); }
+                send-attachment(kind) => { root.send-attachment(kind); }
+                react-message(uri, emoji) => { root.react-message(uri, emoji); }
+                react-to-message(uri, emoji) => { root.react-to-message(uri, emoji); }
+                reply-to-message(uri) => { root.reply-to-message(uri); }
+                start-edit-message(uri, txt) => { root.start-edit-message(uri, txt); }
+                commit-edit-message(uri, txt) => {
+                    root.commit-edit-message(uri, txt);
+                    root.edit-message(uri);
+                }
+                cancel-reply-or-edit() => { root.cancel-reply-or-edit(); }
+                delete-message(uri) => { root.delete-message(uri); }
+                delete-message-requested(uri) => { root.delete-message(uri); }
+                edit-message-requested(uri) => { root.edit-message(uri); }
+            }
+        }
+
+        // Reserve 196px in the main VerticalLayout when the Mobile Touch Keyboard is open
+        if SuperTheme.is-mobile-compact && SuperTheme.mobile-keyboard-open : Rectangle {
+            height: 196px;
+            background: SuperTheme.surface-bg;
+        }
+
+        // Bottom Safe-Area Spacer (Android Gesture Navigation Bar)
+        Rectangle {
+            height: SuperTheme.safe-area-bottom;
+            background: ThemePalette.bg-secondary;
+        }
+    }
+
+    // =========================================================================
+    // 2A. STEP 1 OF ACCOUNT SELECTION: Welcome & Onboarding Overlay
+    //     ("+ Aggiungi un Account" -> Opens Step 2 Protocol List!)
+    // =========================================================================
+    if root.show-welcome-screen || (root.accounts.length == 0 && !root.is-demo-mockup-active) : Rectangle {
+        x: 0px;
+        y: 0px;
+        width: 100%;
+        height: root.height - root.active-keyboard-inset;
+        background: #000000cc;
+
+        TouchArea {}
+
+        Rectangle {
+            width: (SuperTheme.is-mobile-compact || root.width < 600px)
+                ? (root.width - 16px)
+                : Math.min(560px, root.width - 32px);
+            height: (SuperTheme.is-mobile-compact || parent.height < 640px)
+                ? (parent.height - SuperTheme.safe-area-top - SuperTheme.safe-area-bottom - 16px)
+                : Math.min(480px, parent.height - SuperTheme.safe-area-top - SuperTheme.safe-area-bottom - 32px);
+            x: (parent.width - self.width) / 2;
+            y: SuperTheme.safe-area-top + ((parent.height - SuperTheme.safe-area-top - SuperTheme.safe-area-bottom) - self.height) / 2;
+            border-radius: 16px;
+            background: ThemePalette.bg-secondary;
+            border-width: 1px;
+            border-color: ThemePalette.accent-primary;
+            clip: true;
+
+            VerticalLayout {
+                padding: SuperTheme.is-mobile-compact ? 16px : 22px;
+                spacing: 12px;
+
+                // Welcome Header with Hero Badge "W" (28px bold)
+                HorizontalLayout {
+                    spacing: 12px;
+
+                    Rectangle {
+                        width: 52px;
+                        height: 52px;
+                        y: (parent.height - self.height) / 2;
+                        border-radius: 26px;
+                        background: ThemePalette.accent-primary;
+
+                        Text {
+                            text: "W";
+                            color: #FFFFFF;
+                            font-size: 28px;
+                            font-weight: 800;
+                            horizontal-alignment: center;
+                            vertical-alignment: center;
+                        }
+                    }
+
+                    VerticalLayout {
+                        horizontal-stretch: 1;
+                        alignment: center;
+                        spacing: 3px;
+
+                        Text {
+                            text: "Benvenuto in Warp IM";
+                            color: ThemePalette.text-primary;
+                            font-size: SuperTheme.is-mobile-compact ? 16px : 18px;
+                            font-weight: 700;
+                            wrap: word-wrap;
+                        }
+
+                        Text {
+                            text: "Messaggistica Universale Nativa • 8 Protocolli in un'unica App";
+                            color: ThemePalette.text-secondary;
+                            font-size: 12px;
+                            wrap: word-wrap;
+                        }
+                    }
+
+                    if root.accounts.length > 0 || root.is-demo-mockup-active : Rectangle {
+                        width: 36px;
+                        height: 36px;
+                        y: (parent.height - self.height) / 2;
+                        border-radius: 18px;
+                        background: ThemePalette.bg-elevated;
+
+                        Text {
+                            text: "×";
+                            color: ThemePalette.text-primary;
+                            font-size: 16px;
+                            font-weight: 700;
+                            horizontal-alignment: center;
+                            vertical-alignment: center;
+                        }
+
+                        TouchArea {
+                            mouse-cursor: pointer;
+                            clicked => {
+                                root.show-welcome-screen = false;
+                            }
+                        }
+                    }
+                }
+
+                ScrollView {
+                    vertical-stretch: 1;
+                    mouse-drag-pan-enabled: true;
+                    horizontal-scrollbar-policy: always-off;
+
+                    VerticalLayout {
+                        width: parent.visible-width;
+                        spacing: 12px;
+                        alignment: start;
+
+                        // Feature Badges Row: [1], [2], [3]
+                        HorizontalLayout {
+                            spacing: 6px;
+
+                            Rectangle {
+                                horizontal-stretch: 1;
+                                height: 34px;
+                                border-radius: 8px;
+                                background: ThemePalette.bg-tertiary;
+                                border-width: 1px;
+                                border-color: ThemePalette.border-subtle;
+                                Text {
+                                    text: "[1] 8 Protocolli";
+                                    color: ThemePalette.accent-primary;
+                                    font-size: 10px;
+                                    font-weight: 700;
+                                    horizontal-alignment: center;
+                                    vertical-alignment: center;
+                                }
+                            }
+
+                            Rectangle {
+                                horizontal-stretch: 1;
+                                height: 34px;
+                                border-radius: 8px;
+                                background: ThemePalette.bg-tertiary;
+                                border-width: 1px;
+                                border-color: ThemePalette.border-subtle;
+                                Text {
+                                    text: "[2] E2EE Nativo";
+                                    color: ThemePalette.status-online;
+                                    font-size: 10px;
+                                    font-weight: 700;
+                                    horizontal-alignment: center;
+                                    vertical-alignment: center;
+                                }
+                            }
+
+                            Rectangle {
+                                horizontal-stretch: 1;
+                                height: 34px;
+                                border-radius: 8px;
+                                background: ThemePalette.bg-tertiary;
+                                border-width: 1px;
+                                border-color: ThemePalette.border-subtle;
+                                Text {
+                                    text: "[3] SuperThemes";
+                                    color: ThemePalette.text-primary;
+                                    font-size: 10px;
+                                    font-weight: 700;
+                                    horizontal-alignment: center;
+                                    vertical-alignment: center;
+                                }
+                            }
+                        }
+
+                        // Step 1 Primary Card: "+ Aggiungi un Account"
+                        Rectangle {
+                            border-radius: 12px;
+                            background: ThemePalette.bg-primary;
+                            border-width: 1px;
+                            border-color: ThemePalette.border-subtle;
+
+                            VerticalLayout {
+                                padding: 16px;
+                                spacing: 10px;
+
+                                Text {
+                                    text: "[1] Connetti i tuoi Account Reali";
+                                    color: ThemePalette.accent-primary;
+                                    font-size: 14px;
+                                    font-weight: 700;
+                                    wrap: word-wrap;
+                                }
+
+                                Text {
+                                    text: "Accedi o registrati su Telegram (MTProto 2.0), Matrix (Megolm E2EE), XMPP (OMEMO v2), Nostr (NIP-17/44), SimpleX, IRCv3, Stoat e Mattermost.";
+                                    color: ThemePalette.text-secondary;
+                                    font-size: 12px;
+                                    wrap: word-wrap;
+                                }
+
+                                // STEP 1 PRIMARY CTA: "+ Aggiungi un Account"
+                                Rectangle {
+                                    height: 48px;
+                                    border-radius: 12px;
+                                    background: step1-add-touch.has-hover
+                                        ? ThemePalette.accent-secondary
+                                        : ThemePalette.accent-primary;
+
+                                    Text {
+                                        text: "+ Aggiungi un Account";
+                                        color: #FFFFFF;
+                                        font-size: 14px;
+                                        font-weight: 700;
+                                        horizontal-alignment: center;
+                                        vertical-alignment: center;
+                                    }
+
+                                    step1-add-touch := TouchArea {
+                                        mouse-cursor: pointer;
+                                        clicked => {
+                                            root.show-protocol-picker-modal = true;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        // Secondary Option Card: "Avvia Demo Interattiva (Mockup)"
+                        Rectangle {
+                            border-radius: 12px;
+                            background: ThemePalette.bg-tertiary;
+                            border-width: 1px;
+                            border-color: ThemePalette.status-warning;
+
+                            VerticalLayout {
+                                padding: 16px;
+                                spacing: 10px;
+
+                                Text {
+                                    text: "[2] Vuoi prima esplorare l'interfaccia?";
+                                    color: ThemePalette.status-warning;
+                                    font-size: 13px;
+                                    font-weight: 700;
+                                    wrap: word-wrap;
+                                }
+
+                                Text {
+                                    text: "Avvia il Mockup Demo Interattivo con conversazioni precaricate su tutti gli 8 protocolli per testare layout, temi e funzionalità.";
+                                    color: ThemePalette.text-secondary;
+                                    font-size: 12px;
+                                    wrap: word-wrap;
+                                }
+
+                                Rectangle {
+                                    height: 46px;
+                                    border-radius: 10px;
+                                    background: demo-btn-touch.has-hover ? ThemePalette.accent-primary : ThemePalette.status-online;
+
+                                    Text {
+                                        text: "Avvia Demo Interattiva (Mockup)";
+                                        color: #0E1621;
+                                        font-size: 13px;
+                                        font-weight: 700;
+                                        horizontal-alignment: center;
+                                        vertical-alignment: center;
+                                    }
+
+                                    demo-btn-touch := TouchArea {
+                                        mouse-cursor: pointer;
+                                        clicked => {
+                                            root.is-demo-mockup-active = true;
+                                            root.show-welcome-screen = false;
+                                            root.activate-demo-mockup();
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // =========================================================================
+    // 2B. STEP 2 OF ACCOUNT SELECTION: Protocol List Modal (`show-protocol-picker-modal`)
+    //     ("Lista con i protocolli" -> Tapping any protocol opens Step 3 Login Modal!)
+    // =========================================================================
+    if root.show-protocol-picker-modal : Rectangle {
+        width: 100%;
+        height: root.height - root.active-keyboard-inset;
+        background: #000000cc;
+
+        TouchArea {
+            clicked => {
+                root.show-protocol-picker-modal = false;
+            }
+        }
+
+        Rectangle {
+            width: (SuperTheme.is-mobile-compact || root.width < 600px)
+                ? (root.width - 16px)
+                : Math.min(540px, root.width - 32px);
+            height: (SuperTheme.is-mobile-compact || parent.height < 680px)
+                ? (parent.height - SuperTheme.safe-area-top - SuperTheme.safe-area-bottom - 16px)
+                : Math.min(620px, parent.height - SuperTheme.safe-area-top - SuperTheme.safe-area-bottom - 32px);
+            x: (parent.width - self.width) / 2;
+            y: SuperTheme.safe-area-top + ((parent.height - SuperTheme.safe-area-top - SuperTheme.safe-area-bottom) - self.height) / 2;
+            border-radius: 16px;
+            background: ThemePalette.bg-secondary;
+            border-width: 1px;
+            border-color: ThemePalette.accent-primary;
+            clip: true;
+
+            TouchArea {}
+
+            VerticalLayout {
+                padding: SuperTheme.is-mobile-compact ? 14px : 20px;
+                spacing: 12px;
+
+                // Protocol Picker Header with Back Button & Close Button
+                HorizontalLayout {
+                    spacing: 10px;
+
+                    Rectangle {
+                        width: 38px;
+                        height: 38px;
+                        y: (parent.height - self.height) / 2;
+                        border-radius: 19px;
+                        background: proto-back-touch.has-hover ? ThemePalette.accent-primary : ThemePalette.bg-elevated;
+                        border-width: 1px;
+                        border-color: ThemePalette.border-subtle;
+
+                        Text {
+                            text: "←";
+                            color: proto-back-touch.has-hover ? #FFFFFF : ThemePalette.text-primary;
+                            font-size: 17px;
+                            font-weight: 700;
+                            horizontal-alignment: center;
+                            vertical-alignment: center;
+                        }
+
+                        proto-back-touch := TouchArea {
+                            mouse-cursor: pointer;
+                            clicked => {
+                                root.show-protocol-picker-modal = false;
+                            }
+                        }
+                    }
+
+                    VerticalLayout {
+                        horizontal-stretch: 1;
+                        alignment: center;
+                        spacing: 2px;
+
+                        Text {
+                            text: "Seleziona il Protocollo";
+                            color: ThemePalette.text-primary;
+                            font-size: 16px;
+                            font-weight: 700;
+                            overflow: elide;
+                        }
+
+                        Text {
+                            text: "Scegli il servizio di messaggistica a cui connetterti";
+                            color: ThemePalette.text-secondary;
+                            font-size: 11px;
+                            overflow: elide;
+                        }
+                    }
+
+                    Rectangle {
+                        width: 36px;
+                        height: 36px;
+                        y: (parent.height - self.height) / 2;
+                        border-radius: 18px;
+                        background: ThemePalette.bg-elevated;
+
+                        Text {
+                            text: "×";
+                            color: ThemePalette.text-primary;
+                            font-size: 15px;
+                            font-weight: 700;
+                            horizontal-alignment: center;
+                            vertical-alignment: center;
+                        }
+
+                        TouchArea {
+                            mouse-cursor: pointer;
+                            clicked => {
+                                root.show-protocol-picker-modal = false;
+                            }
+                        }
+                    }
+                }
+
+                // Scrollable Vertical List of all 8 Protocols
+                ScrollView {
+                    vertical-stretch: 1;
+                    mouse-drag-pan-enabled: true;
+                    horizontal-scrollbar-policy: always-off;
+
+                    VerticalLayout {
+                        width: parent.visible-width;
+                        spacing: 8px;
+                        padding-right: 4px;
+                        alignment: start;
+
+                        // 1. Telegram (TG)
+                        Rectangle {
+                            height: 60px;
+                            border-radius: 12px;
+                            background: pick-tg.has-hover ? ThemePalette.bg-elevated : ThemePalette.bg-tertiary;
+                            border-width: 1.5px;
+                            border-color: #3390EC;
+                            HorizontalLayout {
+                                padding-left: 12px;
+                                padding-right: 12px;
+                                spacing: 12px;
+                                Rectangle {
+                                    width: 40px; height: 40px; y: 10px; border-radius: 20px; background: #3390EC;
+                                    Text { text: "TG"; color: #FFFFFF; font-size: 12px; font-weight: 700; horizontal-alignment: center; vertical-alignment: center; }
+                                }
+                                VerticalLayout {
+                                    horizontal-stretch: 1; alignment: center; spacing: 2px;
+                                    Text { text: "Telegram"; color: ThemePalette.text-primary; font-size: 14px; font-weight: 700; overflow: elide; }
+                                    Text { text: "MTProto 2.0 Nativo • Telefono + OTP, 2FA o Bot Token"; color: ThemePalette.text-secondary; font-size: 11px; overflow: elide; }
+                                }
+                                Text { text: "›"; color: #3390EC; font-size: 22px; font-weight: 700; vertical-alignment: center; }
+                            }
+                            pick-tg := TouchArea {
+                                mouse-cursor: pointer;
+                                clicked => {
+                                    root.inspect-protocol-auth("telegram");
+                                    root.show-protocol-picker-modal = false;
+                                    root.show-auth-modal = true;
+                                }
+                            }
+                        }
+
+                        // 2. Matrix (MX)
+                        Rectangle {
+                            height: 60px;
+                            border-radius: 12px;
+                            background: pick-mx.has-hover ? ThemePalette.bg-elevated : ThemePalette.bg-tertiary;
+                            border-width: 1.5px;
+                            border-color: #0DBD8B;
+                            HorizontalLayout {
+                                padding-left: 12px;
+                                padding-right: 12px;
+                                spacing: 12px;
+                                Rectangle {
+                                    width: 40px; height: 40px; y: 10px; border-radius: 20px; background: #0DBD8B;
+                                    Text { text: "MX"; color: #FFFFFF; font-size: 12px; font-weight: 700; horizontal-alignment: center; vertical-alignment: center; }
+                                }
+                                VerticalLayout {
+                                    horizontal-stretch: 1; alignment: center; spacing: 2px;
+                                    Text { text: "Matrix"; color: ThemePalette.text-primary; font-size: 14px; font-weight: 700; overflow: elide; }
+                                    Text { text: "Homeserver Federato • Spaces, Room & Megolm E2EE"; color: ThemePalette.text-secondary; font-size: 11px; overflow: elide; }
+                                }
+                                Text { text: "›"; color: #0DBD8B; font-size: 22px; font-weight: 700; vertical-alignment: center; }
+                            }
+                            pick-mx := TouchArea {
+                                mouse-cursor: pointer;
+                                clicked => {
+                                    root.inspect-protocol-auth("matrix");
+                                    root.show-protocol-picker-modal = false;
+                                    root.show-auth-modal = true;
+                                }
+                            }
+                        }
+
+                        // 3. XMPP (XM)
+                        Rectangle {
+                            height: 60px;
+                            border-radius: 12px;
+                            background: pick-xmpp.has-hover ? ThemePalette.bg-elevated : ThemePalette.bg-tertiary;
+                            border-width: 1.5px;
+                            border-color: #F59E0B;
+                            HorizontalLayout {
+                                padding-left: 12px;
+                                padding-right: 12px;
+                                spacing: 12px;
+                                Rectangle {
+                                    width: 40px; height: 40px; y: 10px; border-radius: 20px; background: #F59E0B;
+                                    Text { text: "XM"; color: #FFFFFF; font-size: 12px; font-weight: 700; horizontal-alignment: center; vertical-alignment: center; }
+                                }
+                                VerticalLayout {
+                                    horizontal-stretch: 1; alignment: center; spacing: 2px;
+                                    Text { text: "XMPP / Jabber"; color: ThemePalette.text-primary; font-size: 14px; font-weight: 700; overflow: elide; }
+                                    Text { text: "RFC 6120 + OMEMO v2 • Login o Registrazione JID"; color: ThemePalette.text-secondary; font-size: 11px; overflow: elide; }
+                                }
+                                Text { text: "›"; color: #F59E0B; font-size: 22px; font-weight: 700; vertical-alignment: center; }
+                            }
+                            pick-xmpp := TouchArea {
+                                mouse-cursor: pointer;
+                                clicked => {
+                                    root.inspect-protocol-auth("xmpp");
+                                    root.show-protocol-picker-modal = false;
+                                    root.show-auth-modal = true;
+                                }
+                            }
+                        }
+
+                        // 4. Nostr (NS)
+                        Rectangle {
+                            height: 60px;
+                            border-radius: 12px;
+                            background: pick-nostr.has-hover ? ThemePalette.bg-elevated : ThemePalette.bg-tertiary;
+                            border-width: 1.5px;
+                            border-color: #8B5CF6;
+                            HorizontalLayout {
+                                padding-left: 12px;
+                                padding-right: 12px;
+                                spacing: 12px;
+                                Rectangle {
+                                    width: 40px; height: 40px; y: 10px; border-radius: 20px; background: #8B5CF6;
+                                    Text { text: "NS"; color: #FFFFFF; font-size: 12px; font-weight: 700; horizontal-alignment: center; vertical-alignment: center; }
+                                }
+                                VerticalLayout {
+                                    horizontal-stretch: 1; alignment: center; spacing: 2px;
+                                    Text { text: "Nostr"; color: ThemePalette.text-primary; font-size: 14px; font-weight: 700; overflow: elide; }
+                                    Text { text: "Relay Decentralizzati • Chiavi nsec/npub & NIP-17/44"; color: ThemePalette.text-secondary; font-size: 11px; overflow: elide; }
+                                }
+                                Text { text: "›"; color: #8B5CF6; font-size: 22px; font-weight: 700; vertical-alignment: center; }
+                            }
+                            pick-nostr := TouchArea {
+                                mouse-cursor: pointer;
+                                clicked => {
+                                    root.inspect-protocol-auth("nostr");
+                                    root.show-protocol-picker-modal = false;
+                                    root.show-auth-modal = true;
+                                }
+                            }
+                        }
+
+                        // 5. SimpleX (SX)
+                        Rectangle {
+                            height: 60px;
+                            border-radius: 12px;
+                            background: pick-smp.has-hover ? ThemePalette.bg-elevated : ThemePalette.bg-tertiary;
+                            border-width: 1.5px;
+                            border-color: #06B6D4;
+                            HorizontalLayout {
+                                padding-left: 12px;
+                                padding-right: 12px;
+                                spacing: 12px;
+                                Rectangle {
+                                    width: 40px; height: 40px; y: 10px; border-radius: 20px; background: #06B6D4;
+                                    Text { text: "SX"; color: #FFFFFF; font-size: 12px; font-weight: 700; horizontal-alignment: center; vertical-alignment: center; }
+                                }
+                                VerticalLayout {
+                                    horizontal-stretch: 1; alignment: center; spacing: 2px;
+                                    Text { text: "SimpleX Chat"; color: ThemePalette.text-primary; font-size: 14px; font-weight: 700; overflow: elide; }
+                                    Text { text: "Zero-Metadata SMP Queues • Nessun ID Utente Richiesto"; color: ThemePalette.text-secondary; font-size: 11px; overflow: elide; }
+                                }
+                                Text { text: "›"; color: #06B6D4; font-size: 22px; font-weight: 700; vertical-alignment: center; }
+                            }
+                            pick-smp := TouchArea {
+                                mouse-cursor: pointer;
+                                clicked => {
+                                    root.inspect-protocol-auth("simplex");
+                                    root.show-protocol-picker-modal = false;
+                                    root.show-auth-modal = true;
+                                }
+                            }
+                        }
+
+                        // 6. IRCv3 (IR)
+                        Rectangle {
+                            height: 60px;
+                            border-radius: 12px;
+                            background: pick-irc.has-hover ? ThemePalette.bg-elevated : ThemePalette.bg-tertiary;
+                            border-width: 1.5px;
+                            border-color: #10B981;
+                            HorizontalLayout {
+                                padding-left: 12px;
+                                padding-right: 12px;
+                                spacing: 12px;
+                                Rectangle {
+                                    width: 40px; height: 40px; y: 10px; border-radius: 20px; background: #10B981;
+                                    Text { text: "IR"; color: #FFFFFF; font-size: 12px; font-weight: 700; horizontal-alignment: center; vertical-alignment: center; }
+                                }
+                                VerticalLayout {
+                                    horizontal-stretch: 1; alignment: center; spacing: 2px;
+                                    Text { text: "IRCv3"; color: ThemePalette.text-primary; font-size: 14px; font-weight: 700; overflow: elide; }
+                                    Text { text: "Libera.Chat / OFTC / Bouncer Soju • TLS & SASL"; color: ThemePalette.text-secondary; font-size: 11px; overflow: elide; }
+                                }
+                                Text { text: "›"; color: #10B981; font-size: 22px; font-weight: 700; vertical-alignment: center; }
+                            }
+                            pick-irc := TouchArea {
+                                mouse-cursor: pointer;
+                                clicked => {
+                                    root.inspect-protocol-auth("irc");
+                                    root.show-protocol-picker-modal = false;
+                                    root.show-auth-modal = true;
+                                }
+                            }
+                        }
+
+                        // 7. Stoat (ST)
+                        Rectangle {
+                            height: 60px;
+                            border-radius: 12px;
+                            background: pick-stoat.has-hover ? ThemePalette.bg-elevated : ThemePalette.bg-tertiary;
+                            border-width: 1.5px;
+                            border-color: #EF4444;
+                            HorizontalLayout {
+                                padding-left: 12px;
+                                padding-right: 12px;
+                                spacing: 12px;
+                                Rectangle {
+                                    width: 40px; height: 40px; y: 10px; border-radius: 20px; background: #EF4444;
+                                    Text { text: "ST"; color: #FFFFFF; font-size: 12px; font-weight: 700; horizontal-alignment: center; vertical-alignment: center; }
+                                }
+                                VerticalLayout {
+                                    horizontal-stretch: 1; alignment: center; spacing: 2px;
+                                    Text { text: "Stoat (Revolt)"; color: ThemePalette.text-primary; font-size: 14px; font-weight: 700; overflow: elide; }
+                                    Text { text: "Server, Canali & Community • Login o Registrazione"; color: ThemePalette.text-secondary; font-size: 11px; overflow: elide; }
+                                }
+                                Text { text: "›"; color: #EF4444; font-size: 22px; font-weight: 700; vertical-alignment: center; }
+                            }
+                            pick-stoat := TouchArea {
+                                mouse-cursor: pointer;
+                                clicked => {
+                                    root.inspect-protocol-auth("stoat");
+                                    root.show-protocol-picker-modal = false;
+                                    root.show-auth-modal = true;
+                                }
+                            }
+                        }
+
+                        // 8. Mattermost (MM)
+                        Rectangle {
+                            height: 60px;
+                            border-radius: 12px;
+                            background: pick-mm.has-hover ? ThemePalette.bg-elevated : ThemePalette.bg-tertiary;
+                            border-width: 1.5px;
+                            border-color: #3B82F6;
+                            HorizontalLayout {
+                                padding-left: 12px;
+                                padding-right: 12px;
+                                spacing: 12px;
+                                Rectangle {
+                                    width: 40px; height: 40px; y: 10px; border-radius: 20px; background: #3B82F6;
+                                    Text { text: "MM"; color: #FFFFFF; font-size: 12px; font-weight: 700; horizontal-alignment: center; vertical-alignment: center; }
+                                }
+                                VerticalLayout {
+                                    horizontal-stretch: 1; alignment: center; spacing: 2px;
+                                    Text { text: "Mattermost"; color: ThemePalette.text-primary; font-size: 14px; font-weight: 700; overflow: elide; }
+                                    Text { text: "Team Enterprise & Thread • Login o Token Personale"; color: ThemePalette.text-secondary; font-size: 11px; overflow: elide; }
+                                }
+                                Text { text: "›"; color: #3B82F6; font-size: 22px; font-weight: 700; vertical-alignment: center; }
+                            }
+                            pick-mm := TouchArea {
+                                mouse-cursor: pointer;
+                                clicked => {
+                                    root.inspect-protocol-auth("mattermost");
+                                    root.show-protocol-picker-modal = false;
+                                    root.show-auth-modal = true;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // =========================================================================
+    // 3. Dedicated Settings Modal (`Impostazioni` — Opened via `☰`)
+    // =========================================================================
+    if root.show-settings-modal : Rectangle {
+        width: 100%;
+        height: root.height - root.active-keyboard-inset;
+        background: #000000bb;
+
+        TouchArea {
+            clicked => {
+                root.show-settings-modal = false;
+            }
+        }
+
+        Rectangle {
+            width: (SuperTheme.is-mobile-compact || root.width < 640px)
+                ? (root.width - 16px)
+                : Math.min(720px, root.width - 32px);
+            height: (SuperTheme.is-mobile-compact || parent.height < 680px)
+                ? (parent.height - SuperTheme.safe-area-top - SuperTheme.safe-area-bottom - 16px)
+                : Math.min(640px, parent.height - SuperTheme.safe-area-top - SuperTheme.safe-area-bottom - 32px);
+            x: (parent.width - self.width) / 2;
+            y: SuperTheme.safe-area-top + ((parent.height - SuperTheme.safe-area-top - SuperTheme.safe-area-bottom) - self.height) / 2;
+            border-radius: 16px;
+            background: ThemePalette.bg-secondary;
+            border-width: 1px;
+            border-color: ThemePalette.accent-primary;
+            clip: true;
+
+            // Block click-through inside modal
+            TouchArea {}
+
+            VerticalLayout {
+                padding: SuperTheme.is-mobile-compact ? 14px : 18px;
+                spacing: 10px;
+
+                // Modal Header
+                HorizontalLayout {
+                    spacing: 10px;
+
+                    Text {
+                        text: SuperTheme.is-mobile-compact
+                            ? "Impostazioni & Account"
+                            : "Impostazioni — Account, Compositore, SuperThemes, Permessi & Licenza";
+                        color: ThemePalette.text-primary;
+                        font-size: 16px;
+                        font-weight: 700;
+                        horizontal-stretch: 1;
+                        vertical-alignment: center;
+                        overflow: elide;
+                    }
+
+                    Rectangle {
+                        width: 34px;
+                        height: 34px;
+                        border-radius: 17px;
+                        background: close-settings-touch.has-hover ? ThemePalette.status-danger : ThemePalette.bg-elevated;
+
+                        Text {
+                            text: "×";
+                            color: ThemePalette.text-primary;
+                            font-size: 15px;
+                            font-weight: 700;
+                            horizontal-alignment: center;
+                            vertical-alignment: center;
+                        }
+
+                        close-settings-touch := TouchArea {
+                            mouse-cursor: pointer;
+                            clicked => {
+                                root.show-settings-modal = false;
+                            }
+                        }
+                    }
+                }
+
+                ScrollView {
+                    vertical-stretch: 1;
+                    mouse-drag-pan-enabled: true;
+                    horizontal-scrollbar-policy: always-off;
+
+                    VerticalLayout {
+                        width: parent.visible-width;
+                        spacing: 12px;
+                        padding-right: 4px;
+                        alignment: start;
+
+                        // Section 1: Account Attivi e Connessioni
+                        Rectangle {
+                            border-radius: 10px;
+                            background: ThemePalette.bg-tertiary;
+                            border-width: 1px;
+                            border-color: ThemePalette.border-subtle;
+
+                            VerticalLayout {
+                                padding: 12px;
+                                spacing: 8px;
+
+                                HorizontalLayout {
+                                    spacing: 6px;
+                                    Text {
+                                        text: "Account Attivi e Connessioni";
+                                        color: ThemePalette.accent-primary;
+                                        font-size: 13px;
+                                        font-weight: 700;
+                                        horizontal-stretch: 1;
+                                        vertical-alignment: center;
+                                        overflow: elide;
+                                    }
+
+                                    // STEP 1 BUTTON: "+ Aggiungi Account" -> Opens Step 2 Protocol Picker!
+                                    Rectangle {
+                                        width: 148px;
+                                        height: 30px;
+                                        border-radius: 8px;
+                                        background: ThemePalette.accent-primary;
+
+                                        Text {
+                                            text: "+ Aggiungi Account";
+                                            color: #FFFFFF;
+                                            font-size: 11px;
+                                            font-weight: 700;
+                                            horizontal-alignment: center;
+                                            vertical-alignment: center;
+                                        }
+
+                                        TouchArea {
+                                            mouse-cursor: pointer;
+                                            clicked => {
+                                                root.show-settings-modal = false;
+                                                root.show-protocol-picker-modal = true;
+                                            }
+                                        }
+                                    }
+                                }
+
+                                // Isolation Mode Buttons (2x2 Grid so it fits narrow screens cleanly)
+                                HorizontalLayout {
+                                    spacing: 6px;
+
+                                    Rectangle {
+                                        horizontal-stretch: 1;
+                                        height: 30px;
+                                        border-radius: 6px;
+                                        background: root.isolation-mode == "unified"
+                                            ? ThemePalette.accent-primary
+                                            : ThemePalette.bg-elevated;
+                                        Text {
+                                            text: "Unificata";
+                                            color: root.isolation-mode == "unified" ? #FFFFFF : ThemePalette.text-primary;
+                                            font-size: 11px;
+                                            font-weight: 700;
+                                            horizontal-alignment: center;
+                                            vertical-alignment: center;
+                                        }
+                                        TouchArea {
+                                            mouse-cursor: pointer;
+                                            clicked => { root.switch-isolation-mode("unified"); }
+                                        }
+                                    }
+
+                                    Rectangle {
+                                        horizontal-stretch: 1;
+                                        height: 30px;
+                                        border-radius: 6px;
+                                        background: root.isolation-mode == "per_protocol"
+                                            ? ThemePalette.accent-primary
+                                            : ThemePalette.bg-elevated;
+                                        Text {
+                                            text: "Per Protocollo";
+                                            color: root.isolation-mode == "per_protocol" ? #FFFFFF : ThemePalette.text-primary;
+                                            font-size: 11px;
+                                            font-weight: 700;
+                                            horizontal-alignment: center;
+                                            vertical-alignment: center;
+                                        }
+                                        TouchArea {
+                                            mouse-cursor: pointer;
+                                            clicked => { root.switch-isolation-mode("per_protocol"); }
+                                        }
+                                    }
+                                }
+
+                                HorizontalLayout {
+                                    spacing: 6px;
+
+                                    Rectangle {
+                                        horizontal-stretch: 1;
+                                        height: 30px;
+                                        border-radius: 6px;
+                                        background: root.isolation-mode == "per_account"
+                                            ? ThemePalette.accent-primary
+                                            : ThemePalette.bg-elevated;
+                                        Text {
+                                            text: "Per Account";
+                                            color: root.isolation-mode == "per_account" ? #FFFFFF : ThemePalette.text-primary;
+                                            font-size: 11px;
+                                            font-weight: 700;
+                                            horizontal-alignment: center;
+                                            vertical-alignment: center;
+                                        }
+                                        TouchArea {
+                                            mouse-cursor: pointer;
+                                            clicked => { root.switch-isolation-mode("per_account"); }
+                                        }
+                                    }
+
+                                    Rectangle {
+                                        horizontal-stretch: 1;
+                                        height: 30px;
+                                        border-radius: 6px;
+                                        background: root.isolation-mode == "hybrid_custom"
+                                            ? ThemePalette.accent-primary
+                                            : ThemePalette.bg-elevated;
+                                        Text {
+                                            text: "Ibrida";
+                                            color: root.isolation-mode == "hybrid_custom" ? #FFFFFF : ThemePalette.text-primary;
+                                            font-size: 11px;
+                                            font-weight: 700;
+                                            horizontal-alignment: center;
+                                            vertical-alignment: center;
+                                        }
+                                        TouchArea {
+                                            mouse-cursor: pointer;
+                                            clicked => { root.switch-isolation-mode("hybrid_custom"); }
+                                        }
+                                    }
+                                }
+
+                                // Connected Accounts Vertical List with Select & `×` Remove Button
+                                VerticalLayout {
+                                    spacing: 6px;
+                                    for acct in root.accounts : Rectangle {
+                                        height: 36px;
+                                        border-radius: 8px;
+                                        background: root.active-account-id == acct.account-id
+                                            ? ThemePalette.bg-elevated
+                                            : ThemePalette.bg-primary;
+                                        border-width: 1px;
+                                        border-color: acct.enabled ? acct.brand-color : ThemePalette.text-muted;
+
+                                        HorizontalLayout {
+                                            padding-left: 10px;
+                                            padding-right: 6px;
+                                            spacing: 8px;
+
+                                            Rectangle {
+                                                horizontal-stretch: 1;
+                                                background: transparent;
+
+                                                HorizontalLayout {
+                                                    spacing: 6px;
+                                                    Text {
+                                                        text: acct.short-badge + " • " + acct.display-name;
+                                                        color: ThemePalette.text-primary;
+                                                        font-size: 12px;
+                                                        font-weight: 700;
+                                                        vertical-alignment: center;
+                                                        overflow: elide;
+                                                        horizontal-stretch: 1;
+                                                    }
+                                                    if acct.unread-count > 0 : Text {
+                                                        text: "(" + acct.unread-count + ")";
+                                                        color: ThemePalette.status-online;
+                                                        font-size: 11px;
+                                                        font-weight: 700;
+                                                        vertical-alignment: center;
+                                                    }
+                                                }
+
+                                                TouchArea {
+                                                    mouse-cursor: pointer;
+                                                    clicked => {
+                                                        root.select-account(acct.account-id);
+                                                    }
+                                                }
+                                            }
+
+                                            // Remove Account Button `×`
+                                            Rectangle {
+                                                width: 28px;
+                                                height: 26px;
+                                                y: 5px;
+                                                border-radius: 6px;
+                                                background: rm-acct-touch.has-hover ? ThemePalette.status-danger : ThemePalette.bg-tertiary;
+
+                                                Text {
+                                                    text: "×";
+                                                    color: rm-acct-touch.has-hover ? #FFFFFF : ThemePalette.status-danger;
+                                                    font-size: 13px;
+                                                    font-weight: 700;
+                                                    horizontal-alignment: center;
+                                                    vertical-alignment: center;
+                                                }
+
+                                                rm-acct-touch := TouchArea {
+                                                    mouse-cursor: pointer;
+                                                    clicked => {
+                                                        root.remove-account(acct.account-id);
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+
+                                // Telegram Backend Mode Switcher & Horizontally Scrollable Protocol Toggles Strip
+                                HorizontalLayout {
+                                    spacing: 6px;
+
+                                    Rectangle {
+                                        width: 96px;
+                                        height: 26px;
+                                        border-radius: 6px;
+                                        background: root.telegram-backend-mode == "public"
+                                            ? ThemePalette.accent-primary
+                                            : ThemePalette.bg-elevated;
+                                        Text {
+                                            text: "TG Produzione";
+                                            color: root.telegram-backend-mode == "public" ? #FFFFFF : ThemePalette.text-primary;
+                                            font-size: 10px;
+                                            font-weight: 700;
+                                            horizontal-alignment: center;
+                                            vertical-alignment: center;
+                                        }
+                                        TouchArea {
+                                            mouse-cursor: pointer;
+                                            clicked => { root.switch-telegram-backend-mode("public"); }
+                                        }
+                                    }
+
+                                    Rectangle {
+                                        width: 96px;
+                                        height: 26px;
+                                        border-radius: 6px;
+                                        background: root.telegram-backend-mode == "test_dc2"
+                                            ? ThemePalette.status-warning
+                                            : ThemePalette.bg-elevated;
+                                        Text {
+                                            text: "TG Test DC2";
+                                            color: root.telegram-backend-mode == "test_dc2" ? #0E1621 : ThemePalette.text-primary;
+                                            font-size: 10px;
+                                            font-weight: 700;
+                                            horizontal-alignment: center;
+                                            vertical-alignment: center;
+                                        }
+                                        TouchArea {
+                                            mouse-cursor: pointer;
+                                            clicked => { root.switch-telegram-backend-mode("test_dc2"); }
+                                        }
+                                    }
+                                }
+
+                                proto-toggle-flick := Flickable {
+                                    width: 100%;
+                                    height: 32px;
+                                    interactive: true;
+                                    mouse-drag-pan-enabled: true;
+                                    viewport-height: 32px;
+                                    viewport-width: Math.max(self.width, root.protocol-toggles.length * 92px);
+
+                                    HorizontalLayout {
+                                        spacing: 6px;
+                                        alignment: start;
+                                        for proto in root.protocol-toggles : Rectangle {
+                                            width: 86px;
+                                            height: 28px;
+                                            y: 2px;
+                                            border-radius: 14px;
+                                            background: proto.enabled ? ThemePalette.bg-elevated : ThemePalette.bg-primary;
+                                            border-width: 1px;
+                                            border-color: proto.enabled ? proto.brand-color : ThemePalette.text-muted;
+
+                                            HorizontalLayout {
+                                                padding-left: 6px;
+                                                padding-right: 6px;
+                                                spacing: 4px;
+                                                alignment: center;
+
+                                                Text {
+                                                    text: proto.enabled ? "●" : "○";
+                                                    color: proto.enabled ? ThemePalette.status-online : ThemePalette.text-muted;
+                                                    font-size: 10px;
+                                                    vertical-alignment: center;
+                                                }
+                                                Text {
+                                                    text: proto.name;
+                                                    color: proto.enabled ? ThemePalette.text-primary : ThemePalette.text-muted;
+                                                    font-size: 10px;
+                                                    font-weight: 700;
+                                                    vertical-alignment: center;
+                                                    overflow: elide;
+                                                }
+                                            }
+
+                                            TouchArea {
+                                                mouse-cursor: pointer;
+                                                clicked => {
+                                                    root.toggle-protocol(proto.slug, !proto.enabled);
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        // Section 2: Tasto Invio e Compositore
+                        Rectangle {
+                            border-radius: 10px;
+                            background: ThemePalette.bg-tertiary;
+                            border-width: 1px;
+                            border-color: ThemePalette.border-subtle;
+
+                            VerticalLayout {
+                                padding: 12px;
+                                spacing: 8px;
+
+                                Text {
+                                    text: "Tasto Invio e Compositore";
+                                    color: ThemePalette.accent-primary;
+                                    font-size: 13px;
+                                    font-weight: 700;
+                                    overflow: elide;
+                                }
+
+                                VerticalLayout {
+                                    spacing: 6px;
+
+                                    Rectangle {
+                                        height: 36px;
+                                        border-radius: 8px;
+                                        background: root.send-on-enter
+                                            ? ThemePalette.accent-primary
+                                            : ThemePalette.bg-elevated;
+                                        border-width: 1px;
+                                        border-color: ThemePalette.border-subtle;
+
+                                        Text {
+                                            text: "Invio per spedire (Ctrl/Alt+Invio = a capo)";
+                                            color: root.send-on-enter ? #FFFFFF : ThemePalette.text-primary;
+                                            font-size: 11px;
+                                            font-weight: 700;
+                                            horizontal-alignment: center;
+                                            vertical-alignment: center;
+                                            overflow: elide;
+                                        }
+
+                                        TouchArea {
+                                            mouse-cursor: pointer;
+                                            clicked => {
+                                                root.send-on-enter = true;
+                                                root.toggle-send-on-enter(true);
+                                            }
+                                        }
+                                    }
+
+                                    Rectangle {
+                                        height: 36px;
+                                        border-radius: 8px;
+                                        background: !root.send-on-enter
+                                            ? ThemePalette.accent-primary
+                                            : ThemePalette.bg-elevated;
+                                        border-width: 1px;
+                                        border-color: ThemePalette.border-subtle;
+
+                                        Text {
+                                            text: "Ctrl+Invio / Alt+Invio per spedire (Invio = a capo)";
+                                            color: !root.send-on-enter ? #FFFFFF : ThemePalette.text-primary;
+                                            font-size: 11px;
+                                            font-weight: 700;
+                                            horizontal-alignment: center;
+                                            vertical-alignment: center;
+                                            overflow: elide;
+                                        }
+
+                                        TouchArea {
+                                            mouse-cursor: pointer;
+                                            clicked => {
+                                                root.send-on-enter = false;
+                                                root.toggle-send-on-enter(false);
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        // Section 3: Aspetto e Temi (SuperThemes)
+                        Rectangle {
+                            border-radius: 10px;
+                            background: ThemePalette.bg-tertiary;
+                            border-width: 1px;
+                            border-color: ThemePalette.border-subtle;
+
+                            VerticalLayout {
+                                padding: 12px;
+                                spacing: 8px;
+
+                                HorizontalLayout {
+                                    spacing: 6px;
+                                    Text {
+                                        text: "Aspetto e Temi (SuperThemes)";
+                                        color: ThemePalette.accent-primary;
+                                        font-size: 13px;
+                                        font-weight: 700;
+                                        horizontal-stretch: 1;
+                                        vertical-alignment: center;
+                                        overflow: elide;
+                                    }
+
+                                    Rectangle {
+                                        width: 136px;
+                                        height: 28px;
+                                        border-radius: 6px;
+                                        background: SuperTheme.is-mobile-compact
+                                            ? ThemePalette.accent-primary
+                                            : ThemePalette.bg-elevated;
+                                        border-width: 1px;
+                                        border-color: ThemePalette.border-subtle;
+
+                                        Text {
+                                            text: SuperTheme.is-mobile-compact ? "Vista Mobile" : "Vista Desktop";
+                                            color: SuperTheme.is-mobile-compact ? #FFFFFF : ThemePalette.text-primary;
+                                            font-size: 11px;
+                                            font-weight: 700;
+                                            horizontal-alignment: center;
+                                            vertical-alignment: center;
+                                        }
+
+                                        TouchArea {
+                                            mouse-cursor: pointer;
+                                            clicked => { root.toggle-mobile-form-factor(); }
+                                        }
+                                    }
+                                }
+
+                                // SuperTheme Buttons (2x2 Grid)
+                                HorizontalLayout {
+                                    spacing: 6px;
+
+                                    Rectangle {
+                                        horizontal-stretch: 1;
+                                        height: 32px;
+                                        border-radius: 6px;
+                                        background: SuperTheme.supertheme-id == "telegram"
+                                            ? ThemePalette.accent-primary
+                                            : ThemePalette.bg-elevated;
+                                        Text {
+                                            text: "[TG] Telegram";
+                                            color: SuperTheme.supertheme-id == "telegram" ? #FFFFFF : ThemePalette.text-primary;
+                                            font-size: 11px;
+                                            font-weight: 700;
+                                            horizontal-alignment: center;
+                                            vertical-alignment: center;
+                                        }
+                                        TouchArea {
+                                            mouse-cursor: pointer;
+                                            clicked => { root.switch-supertheme("telegram"); }
+                                        }
+                                    }
+
+                                    Rectangle {
+                                        horizontal-stretch: 1;
+                                        height: 32px;
+                                        border-radius: 6px;
+                                        background: SuperTheme.supertheme-id == "whatsapp"
+                                            ? ThemePalette.accent-primary
+                                            : ThemePalette.bg-elevated;
+                                        Text {
+                                            text: "[WA] WhatsApp";
+                                            color: SuperTheme.supertheme-id == "whatsapp" ? #FFFFFF : ThemePalette.text-primary;
+                                            font-size: 11px;
+                                            font-weight: 700;
+                                            horizontal-alignment: center;
+                                            vertical-alignment: center;
+                                        }
+                                        TouchArea {
+                                            mouse-cursor: pointer;
+                                            clicked => { root.switch-supertheme("whatsapp"); }
+                                        }
+                                    }
+                                }
+
+                                HorizontalLayout {
+                                    spacing: 6px;
+
+                                    Rectangle {
+                                        horizontal-stretch: 1;
+                                        height: 32px;
+                                        border-radius: 6px;
+                                        background: SuperTheme.supertheme-id == "discord"
+                                            ? ThemePalette.accent-primary
+                                            : ThemePalette.bg-elevated;
+                                        Text {
+                                            text: "[DC] Discord Rail";
+                                            color: SuperTheme.supertheme-id == "discord" ? #FFFFFF : ThemePalette.text-primary;
+                                            font-size: 11px;
+                                            font-weight: 700;
+                                            horizontal-alignment: center;
+                                            vertical-alignment: center;
+                                        }
+                                        TouchArea {
+                                            mouse-cursor: pointer;
+                                            clicked => { root.switch-supertheme("discord"); }
+                                        }
+                                    }
+
+                                    Rectangle {
+                                        horizontal-stretch: 1;
+                                        height: 32px;
+                                        border-radius: 6px;
+                                        background: SuperTheme.supertheme-id == "irc_classic"
+                                            ? ThemePalette.accent-primary
+                                            : ThemePalette.bg-elevated;
+                                        Text {
+                                            text: "[IR] IRC Dense";
+                                            color: SuperTheme.supertheme-id == "irc_classic" ? #FFFFFF : ThemePalette.text-primary;
+                                            font-size: 11px;
+                                            font-weight: 700;
+                                            horizontal-alignment: center;
+                                            vertical-alignment: center;
+                                        }
+                                        TouchArea {
+                                            mouse-cursor: pointer;
+                                            clicked => { root.switch-supertheme("irc_classic"); }
+                                        }
+                                    }
+                                }
+
+                                // Palette Buttons (2 compact rows)
+                                HorizontalLayout {
+                                    spacing: 6px;
+
+                                    Rectangle {
+                                        horizontal-stretch: 1;
+                                        height: 30px;
+                                        border-radius: 6px;
+                                        background: ThemePalette.palette-id == "light"
+                                            ? ThemePalette.accent-secondary
+                                            : ThemePalette.bg-elevated;
+                                        Text {
+                                            text: "Chiaro";
+                                            color: ThemePalette.palette-id == "light" ? #FFFFFF : ThemePalette.text-primary;
+                                            font-size: 11px;
+                                            font-weight: 700;
+                                            horizontal-alignment: center;
+                                            vertical-alignment: center;
+                                        }
+                                        TouchArea {
+                                            mouse-cursor: pointer;
+                                            clicked => { root.switch-palette("light"); }
+                                        }
+                                    }
+
+                                    Rectangle {
+                                        horizontal-stretch: 1;
+                                        height: 30px;
+                                        border-radius: 6px;
+                                        background: (ThemePalette.palette-id == "dark" || ThemePalette.palette-id == "night_telegram")
+                                            ? ThemePalette.accent-secondary
+                                            : ThemePalette.bg-elevated;
+                                        Text {
+                                            text: "Scuro TG";
+                                            color: (ThemePalette.palette-id == "dark" || ThemePalette.palette-id == "night_telegram")
+                                                ? #FFFFFF
+                                                : ThemePalette.text-primary;
+                                            font-size: 11px;
+                                            font-weight: 700;
+                                            horizontal-alignment: center;
+                                            vertical-alignment: center;
+                                        }
+                                        TouchArea {
+                                            mouse-cursor: pointer;
+                                            clicked => { root.switch-palette("night_telegram"); }
+                                        }
+                                    }
+
+                                    Rectangle {
+                                        horizontal-stretch: 1;
+                                        height: 30px;
+                                        border-radius: 6px;
+                                        background: ThemePalette.palette-id == "oled"
+                                            ? ThemePalette.accent-secondary
+                                            : ThemePalette.bg-elevated;
+                                        Text {
+                                            text: "OLED";
+                                            color: ThemePalette.palette-id == "oled" ? #FFFFFF : ThemePalette.text-primary;
+                                            font-size: 11px;
+                                            font-weight: 700;
+                                            horizontal-alignment: center;
+                                            vertical-alignment: center;
+                                        }
+                                        TouchArea {
+                                            mouse-cursor: pointer;
+                                            clicked => { root.switch-palette("oled"); }
+                                        }
+                                    }
+                                }
+
+                                HorizontalLayout {
+                                    spacing: 6px;
+
+                                    Rectangle {
+                                        horizontal-stretch: 1;
+                                        height: 30px;
+                                        border-radius: 6px;
+                                        background: ThemePalette.palette-id == "discord_dark"
+                                            ? ThemePalette.accent-secondary
+                                            : ThemePalette.bg-elevated;
+                                        Text {
+                                            text: "Discord Dark";
+                                            color: ThemePalette.palette-id == "discord_dark" ? #FFFFFF : ThemePalette.text-primary;
+                                            font-size: 11px;
+                                            font-weight: 700;
+                                            horizontal-alignment: center;
+                                            vertical-alignment: center;
+                                        }
+                                        TouchArea {
+                                            mouse-cursor: pointer;
+                                            clicked => { root.switch-palette("discord_dark"); }
+                                        }
+                                    }
+
+                                    Rectangle {
+                                        horizontal-stretch: 1;
+                                        height: 30px;
+                                        border-radius: 6px;
+                                        background: ThemePalette.palette-id == "catppuccin_mocha"
+                                            ? ThemePalette.accent-secondary
+                                            : ThemePalette.bg-elevated;
+                                        Text {
+                                            text: "Catppuccin";
+                                            color: ThemePalette.palette-id == "catppuccin_mocha" ? #FFFFFF : ThemePalette.text-primary;
+                                            font-size: 11px;
+                                            font-weight: 700;
+                                            horizontal-alignment: center;
+                                            vertical-alignment: center;
+                                        }
+                                        TouchArea {
+                                            mouse-cursor: pointer;
+                                            clicked => { root.switch-palette("catppuccin_mocha"); }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        // Section 4: Permessi Android e Storage Locale
+                        Rectangle {
+                            border-radius: 10px;
+                            background: ThemePalette.bg-tertiary;
+                            border-width: 1px;
+                            border-color: ThemePalette.accent-primary;
+
+                            VerticalLayout {
+                                padding: 12px;
+                                spacing: 8px;
+
+                                Text {
+                                    text: "Permessi Android e Storage Locale";
+                                    color: ThemePalette.accent-primary;
+                                    font-size: 13px;
+                                    font-weight: 700;
+                                    overflow: elide;
+                                }
+
+                                Text {
+                                    text: "Autorizza notifiche, accesso a foto/documenti, microfono per note vocali e fotocamera per QR code.";
+                                    color: ThemePalette.text-secondary;
+                                    font-size: 11px;
+                                    wrap: word-wrap;
+                                }
+
+                                Rectangle {
+                                    height: 40px;
+                                    border-radius: 8px;
+                                    background: req-perm-touch.has-hover ? ThemePalette.accent-secondary : ThemePalette.accent-primary;
+
+                                    Text {
+                                        text: "Richiedi Permessi Android (Storage, Notifiche, Audio, Camera)";
+                                        color: #FFFFFF;
+                                        font-size: 11px;
+                                        font-weight: 700;
+                                        horizontal-alignment: center;
+                                        vertical-alignment: center;
+                                        overflow: elide;
+                                    }
+
+                                    req-perm-touch := TouchArea {
+                                        mouse-cursor: pointer;
+                                        clicked => {
+                                            SuperTheme.request-android-permissions();
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        // Section 5: Licenza (PEFL v1.0) & Demo Controls
+                        Rectangle {
+                            border-radius: 10px;
+                            background: ThemePalette.bg-tertiary;
+                            border-width: 1px;
+                            border-color: ThemePalette.border-subtle;
+
+                            VerticalLayout {
+                                padding: 12px;
+                                spacing: 8px;
+
+                                Text {
+                                    text: "Licenza (PEFL v1.0)";
+                                    color: ThemePalette.status-warning;
+                                    font-size: 13px;
+                                    font-weight: 700;
+                                    overflow: elide;
+                                }
+
+                                Rectangle {
+                                    height: 38px;
+                                    border-radius: 8px;
+                                    background: ThemePalette.bg-elevated;
+                                    border-width: 1px;
+                                    border-color: ThemePalette.status-warning;
+
+                                    Text {
+                                        text: root.is-demo-mockup-active
+                                            ? "Esci dalla Modalità Demo / Torna alla Schermata Iniziale"
+                                            : "Schermata Benvenuto & Mockup Demo";
+                                        color: ThemePalette.status-warning;
+                                        font-size: 11px;
+                                        font-weight: 700;
+                                        horizontal-alignment: center;
+                                        vertical-alignment: center;
+                                        overflow: elide;
+                                    }
+
+                                    TouchArea {
+                                        mouse-cursor: pointer;
+                                        clicked => {
+                                            root.show-settings-modal = false;
+                                            if (root.is-demo-mockup-active) {
+                                                root.is-demo-mockup-active = false;
+                                                root.show-welcome-screen = true;
+                                                root.exit-demo-mockup();
+                                            } else {
+                                                root.show-welcome-screen = true;
+                                            }
+                                        }
+                                    }
+                                }
+
+                                Rectangle {
+                                    height: 36px;
+                                    border-radius: 8px;
+                                    background: ThemePalette.bg-elevated;
+                                    border-width: 1px;
+                                    border-color: ThemePalette.status-warning;
+
+                                    Text {
+                                        text: "PEFL • Visualizza Licenza PEFL v1.0 (Rubens Rainelli)";
+                                        color: ThemePalette.status-warning;
+                                        font-size: 11px;
+                                        font-weight: 700;
+                                        horizontal-alignment: center;
+                                        vertical-alignment: center;
+                                    }
+
+                                    TouchArea {
+                                        mouse-cursor: pointer;
+                                        clicked => {
+                                            root.show-settings-modal = false;
+                                            root.show-pefl-eula-modal = true;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // =========================================================================
+    // 4. "+ Nuova Chat / Unisciti a Canale" Modal (`show-new-chat-modal`)
+    // =========================================================================
+    if root.show-new-chat-modal : Rectangle {
+        x: 0px;
+        y: 0px;
+        width: 100%;
+        height: root.height - root.active-keyboard-inset;
+        background: #000000bb;
+
+        TouchArea {
+            clicked => {
+                root.show-new-chat-modal = false;
+            }
+        }
+
+        Rectangle {
+            property <length> modal-bottom-pad: (SuperTheme.is-mobile-compact && SuperTheme.mobile-keyboard-open)
+                ? 4px
+                : SuperTheme.safe-area-bottom;
+            width: (SuperTheme.is-mobile-compact || root.width < 600px)
+                ? (root.width - 16px)
+                : Math.min(540px, root.width - 32px);
+            height: (SuperTheme.is-mobile-compact || parent.height < 520px)
+                ? (parent.height - SuperTheme.safe-area-top - self.modal-bottom-pad - 12px)
+                : Math.min(440px, parent.height - SuperTheme.safe-area-top - self.modal-bottom-pad - 24px);
+            x: (parent.width - self.width) / 2;
+            y: SuperTheme.safe-area-top + ((parent.height - SuperTheme.safe-area-top - self.modal-bottom-pad) - self.height) / 2;
+            border-radius: 14px;
+            background: ThemePalette.bg-secondary;
+            border-width: 1px;
+            border-color: ThemePalette.accent-primary;
+            clip: true;
+
+            TouchArea {}
+
+            VerticalLayout {
+                padding: SuperTheme.is-mobile-compact ? 14px : 20px;
+                spacing: 10px;
+
+                // Header
+                HorizontalLayout {
+                    spacing: 8px;
+                    Text {
+                        text: "+ Nuova Conversazione / Canale";
+                        color: ThemePalette.text-primary;
+                        font-size: 16px;
+                        font-weight: 700;
+                        horizontal-stretch: 1;
+                        vertical-alignment: center;
+                        overflow: elide;
+                    }
+
+                    Rectangle {
+                        width: 32px;
+                        height: 32px;
+                        border-radius: 16px;
+                        background: ThemePalette.bg-elevated;
+
+                        Text {
+                            text: "×";
+                            color: ThemePalette.text-primary;
+                            font-size: 15px;
+                            font-weight: 700;
+                            horizontal-alignment: center;
+                            vertical-alignment: center;
+                        }
+
+                        TouchArea {
+                            mouse-cursor: pointer;
+                            clicked => { root.show-new-chat-modal = false; }
+                        }
+                    }
+                }
+
+                ScrollView {
+                    vertical-stretch: 1;
+                    mouse-drag-pan-enabled: true;
+                    horizontal-scrollbar-policy: always-off;
+
+                    VerticalLayout {
+                        width: parent.visible-width;
+                        spacing: 12px;
+                        alignment: start;
+
+                        // Account Selector (Horizontally Scrollable Flickable)
+                        VerticalLayout {
+                            spacing: 4px;
+                            Text {
+                                text: "1. Seleziona Account Mittente:";
+                                color: ThemePalette.text-secondary;
+                                font-size: 11px;
+                                font-weight: 700;
+                            }
+
+                            new-chat-acct-flick := Flickable {
+                                width: 100%;
+                                height: 30px;
+                                interactive: true;
+                                mouse-drag-pan-enabled: true;
+                                viewport-height: 30px;
+                                viewport-width: Math.max(self.width, root.accounts.length * 92px);
+
+                                HorizontalLayout {
+                                    spacing: 6px;
+                                    alignment: start;
+                                    for acct in root.accounts : Rectangle {
+                                        width: 86px;
+                                        height: 26px;
+                                        y: 2px;
+                                        border-radius: 13px;
+                                        background: root.new-chat-account-id == acct.account-id
+                                            ? ThemePalette.accent-primary
+                                            : ThemePalette.bg-elevated;
+                                        border-width: 1px;
+                                        border-color: acct.brand-color;
+
+                                        Text {
+                                            text: acct.short-badge;
+                                            color: root.new-chat-account-id == acct.account-id ? #FFFFFF : ThemePalette.text-primary;
+                                            font-size: 10px;
+                                            font-weight: 700;
+                                            horizontal-alignment: center;
+                                            vertical-alignment: center;
+                                            overflow: elide;
+                                        }
+
+                                        TouchArea {
+                                            mouse-cursor: pointer;
+                                            clicked => {
+                                                root.new-chat-account-id = acct.account-id;
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        // Chat Type Selector (`Chat Diretta` vs `Gruppo / Canale`)
+                        VerticalLayout {
+                            spacing: 4px;
+                            Text {
+                                text: "2. Tipo di Conversazione:";
+                                color: ThemePalette.text-secondary;
+                                font-size: 11px;
+                                font-weight: 700;
+                            }
+
+                            HorizontalLayout {
+                                spacing: 8px;
+
+                                Rectangle {
+                                    horizontal-stretch: 1;
+                                    height: 34px;
+                                    border-radius: 8px;
+                                    background: !root.new-chat-is-group
+                                        ? ThemePalette.accent-primary
+                                        : ThemePalette.bg-elevated;
+                                    Text {
+                                        text: "Chat Diretta";
+                                        color: !root.new-chat-is-group ? #FFFFFF : ThemePalette.text-primary;
+                                        font-size: 12px;
+                                        font-weight: 700;
+                                        horizontal-alignment: center;
+                                        vertical-alignment: center;
+                                    }
+                                    TouchArea {
+                                        mouse-cursor: pointer;
+                                        clicked => { root.new-chat-is-group = false; }
+                                    }
+                                }
+
+                                Rectangle {
+                                    horizontal-stretch: 1;
+                                    height: 34px;
+                                    border-radius: 8px;
+                                    background: root.new-chat-is-group
+                                        ? ThemePalette.accent-primary
+                                        : ThemePalette.bg-elevated;
+                                    Text {
+                                        text: "Gruppo / Canale";
+                                        color: root.new-chat-is-group ? #FFFFFF : ThemePalette.text-primary;
+                                        font-size: 12px;
+                                        font-weight: 700;
+                                        horizontal-alignment: center;
+                                        vertical-alignment: center;
+                                    }
+                                    TouchArea {
+                                        mouse-cursor: pointer;
+                                        clicked => { root.new-chat-is-group = true; }
+                                    }
+                                }
+                            }
+                        }
+
+                        // Target Address / Handle / Room Input (Custom Dark TextInput)
+                        VerticalLayout {
+                            spacing: 4px;
+                            Text {
+                                text: "3. Contatto / Username / JID / Canale / Room:";
+                                color: ThemePalette.text-secondary;
+                                font-size: 11px;
+                                font-weight: 700;
+                            }
+                            Rectangle {
+                                height: 38px;
+                                border-radius: 8px;
+                                background: ThemePalette.bg-tertiary;
+                                border-width: 1px;
+                                border-color: (new-chat-input.has-focus || SuperTheme.mobile-keyboard-target == "new_chat")
+                                    ? ThemePalette.accent-primary
+                                    : ThemePalette.border-subtle;
+
+                                HorizontalLayout {
+                                    padding-left: 10px;
+                                    padding-right: 10px;
+
+                                    Rectangle {
+                                        horizontal-stretch: 1;
+                                        clip: true;
+
+                                        if root.new-chat-remote-target == "" : Text {
+                                            width: parent.width;
+                                            height: parent.height;
+                                            text: "Es. #linux, @alice:matrix.org, +39342..., npub1...";
+                                            color: ThemePalette.text-muted;
+                                            font-size: 12px;
+                                            vertical-alignment: center;
+                                            overflow: elide;
+                                        }
+
+                                        new-chat-input := TextInput {
+                                            width: parent.width;
+                                            height: parent.height;
+                                            text <=> root.new-chat-remote-target;
+                                            color: ThemePalette.text-primary;
+                                            font-size: 13px;
+                                            single-line: true;
+                                            vertical-alignment: center;
+                                        }
+
+                                        TouchArea {
+                                            mouse-cursor: text;
+                                            clicked => {
+                                                new-chat-input.focus();
+                                                SuperTheme.request-soft-keyboard("new_chat", "Destinatario nuova chat");
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        // Chat Display Title Input (Custom Dark TextInput)
+                        VerticalLayout {
+                            spacing: 4px;
+                            Text {
+                                text: "4. Titolo Conversazione:";
+                                color: ThemePalette.text-secondary;
+                                font-size: 11px;
+                                font-weight: 700;
+                            }
+                            Rectangle {
+                                height: 38px;
+                                border-radius: 8px;
+                                background: ThemePalette.bg-tertiary;
+                                border-width: 1px;
+                                border-color: (new-chat-title-input.has-focus || SuperTheme.mobile-keyboard-target == "new_chat_title")
+                                    ? ThemePalette.accent-primary
+                                    : ThemePalette.border-subtle;
+
+                                HorizontalLayout {
+                                    padding-left: 10px;
+                                    padding-right: 10px;
+
+                                    Rectangle {
+                                        horizontal-stretch: 1;
+                                        clip: true;
+
+                                        if root.new-chat-title == "" : Text {
+                                            width: parent.width;
+                                            height: parent.height;
+                                            text: "Es. Alice Rossi, #linux-dev, Team Sicurezza...";
+                                            color: ThemePalette.text-muted;
+                                            font-size: 12px;
+                                            vertical-alignment: center;
+                                            overflow: elide;
+                                        }
+
+                                        new-chat-title-input := TextInput {
+                                            width: parent.width;
+                                            height: parent.height;
+                                            text <=> root.new-chat-title;
+                                            color: ThemePalette.text-primary;
+                                            font-size: 13px;
+                                            single-line: true;
+                                            vertical-alignment: center;
+                                        }
+
+                                        TouchArea {
+                                            mouse-cursor: text;
+                                            clicked => {
+                                                new-chat-title-input.focus();
+                                                SuperTheme.request-soft-keyboard("new_chat_title", "Titolo conversazione");
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        // Submit Button
+                        Rectangle {
+                            height: 42px;
+                            border-radius: 10px;
+                            background: create-chat-touch.has-hover ? ThemePalette.accent-secondary : ThemePalette.accent-primary;
+
+                            Text {
+                                text: "+ Crea / Apri Conversazione";
+                                color: #FFFFFF;
+                                font-size: 13px;
+                                font-weight: 700;
+                                horizontal-alignment: center;
+                                vertical-alignment: center;
+                            }
+
+                            create-chat-touch := TouchArea {
+                                mouse-cursor: pointer;
+                                clicked => {
+                                    if (root.new-chat-remote-target != "" || root.new-chat-title != "") {
+                                        root.create-new-chat(
+                                            root.new-chat-account-id != "" ? root.new-chat-account-id : root.active-account-id,
+                                            root.new-chat-title != "" ? root.new-chat-title : root.new-chat-remote-target,
+                                            root.new-chat-remote-target != "" ? root.new-chat-remote-target : root.new-chat-title,
+                                            root.new-chat-is-group
+                                        );
+                                        root.new-chat-title = "";
+                                        root.new-chat-remote-target = "";
+                                        root.show-new-chat-modal = false;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // =========================================================================
+    // 5. STEP 3 OF ACCOUNT SELECTION: Protocol Login / Sign-Up / Bot Modal
+    //    (`show-auth-modal` — Opened after selecting a protocol in Step 2!)
+    // =========================================================================
+    if root.show-auth-modal : Rectangle {
+        x: 0px;
+        y: 0px;
+        width: 100%;
+        height: root.height - root.active-keyboard-inset;
+        background: #000000cc;
+
+        TouchArea {}
+
+        Rectangle {
+            property <length> modal-bottom-pad: (SuperTheme.is-mobile-compact && SuperTheme.mobile-keyboard-open)
+                ? 4px
+                : SuperTheme.safe-area-bottom;
+            width: (SuperTheme.is-mobile-compact || root.width < 600px)
+                ? (root.width - 16px)
+                : Math.min(580px, root.width - 32px);
+            height: (SuperTheme.is-mobile-compact || parent.height < 640px)
+                ? (parent.height - SuperTheme.safe-area-top - self.modal-bottom-pad - 12px)
+                : Math.min(580px, parent.height - SuperTheme.safe-area-top - self.modal-bottom-pad - 24px);
+            x: (parent.width - self.width) / 2;
+            y: SuperTheme.safe-area-top + ((parent.height - SuperTheme.safe-area-top - self.modal-bottom-pad) - self.height) / 2;
+            border-radius: 16px;
+            background: ThemePalette.bg-secondary;
+            border-width: 1px;
+            border-color: ThemePalette.accent-primary;
+            clip: true;
+
+            VerticalLayout {
+                padding: SuperTheme.is-mobile-compact ? 14px : 18px;
+                spacing: 10px;
+
+                // Header with `← Cambia Protocollo` Back Button (Returns to Step 2!) & Close `×`
+                HorizontalLayout {
+                    spacing: 8px;
+
+                    Rectangle {
+                        width: SuperTheme.is-mobile-compact ? 98px : 136px;
+                        height: 34px;
+                        y: (parent.height - self.height) / 2;
+                        border-radius: 17px;
+                        background: auth-back-touch.has-hover ? ThemePalette.accent-primary : ThemePalette.bg-elevated;
+                        border-width: 1px;
+                        border-color: ThemePalette.accent-primary;
+
+                        Text {
+                            text: SuperTheme.is-mobile-compact ? "← Protocolli" : "← Cambia Protocollo";
+                            color: auth-back-touch.has-hover ? #FFFFFF : ThemePalette.accent-primary;
+                            font-size: 11px;
+                            font-weight: 700;
+                            horizontal-alignment: center;
+                            vertical-alignment: center;
+                        }
+
+                        auth-back-touch := TouchArea {
+                            mouse-cursor: pointer;
+                            clicked => {
+                                root.show-auth-modal = false;
+                                root.show-protocol-picker-modal = true;
+                            }
+                        }
+                    }
+
+                    Text {
+                        text: root.auth-modal-protocol;
+                        color: ThemePalette.text-primary;
+                        font-size: 16px;
+                        font-weight: 700;
+                        horizontal-stretch: 1;
+                        vertical-alignment: center;
+                        overflow: elide;
+                    }
+
+                    Rectangle {
+                        width: 34px;
+                        height: 34px;
+                        y: (parent.height - self.height) / 2;
+                        border-radius: 17px;
+                        background: ThemePalette.bg-elevated;
+
+                        Text {
+                            text: "×";
+                            color: ThemePalette.text-primary;
+                            font-size: 15px;
+                            font-weight: 700;
+                            horizontal-alignment: center;
+                            vertical-alignment: center;
+                        }
+
+                        TouchArea {
+                            mouse-cursor: pointer;
+                            clicked => { root.show-auth-modal = false; }
+                        }
+                    }
+                }
+
+                // Scrollable Login / Sign-Up / Bot Fields Container (Keyboard-safe on Android!)
+                ScrollView {
+                    vertical-stretch: 1;
+                    mouse-drag-pan-enabled: true;
+                    horizontal-scrollbar-policy: always-off;
+
+                    VerticalLayout {
+                        width: parent.visible-width;
+                        spacing: 10px;
+                        padding-right: 4px;
+                        alignment: start;
+
+                        // Onboarding Mode Switcher: Login vs Bot Token vs Sign-Up
+                        Rectangle {
+                            height: 36px;
+                            border-radius: 8px;
+                            background: ThemePalette.bg-tertiary;
+                            border-width: 1px;
+                            border-color: ThemePalette.border-subtle;
+
+                            HorizontalLayout {
+                                padding-left: 6px;
+                                padding-right: 6px;
+                                spacing: 6px;
+
+                                Rectangle {
+                                    horizontal-stretch: 1;
+                                    height: 26px;
+                                    y: 5px;
+                                    border-radius: 6px;
+                                    background: root.auth-modal-mode == "login"
+                                        ? ThemePalette.accent-primary
+                                        : ThemePalette.bg-elevated;
+                                    Text {
+                                        text: root.auth-modal-supports-bot-login
+                                            ? "Utente (OTP)"
+                                            : "Login";
+                                        color: root.auth-modal-mode == "login" ? #FFFFFF : ThemePalette.text-primary;
+                                        font-size: 11px;
+                                        font-weight: 700;
+                                        horizontal-alignment: center;
+                                        vertical-alignment: center;
+                                        overflow: elide;
+                                    }
+                                    TouchArea {
+                                        mouse-cursor: pointer;
+                                        clicked => { root.switch-auth-modal-mode("login"); }
+                                    }
+                                }
+
+                                if root.auth-modal-supports-bot-login : Rectangle {
+                                    horizontal-stretch: 1;
+                                    height: 26px;
+                                    y: 5px;
+                                    border-radius: 6px;
+                                    background: root.auth-modal-mode == "bot_token"
+                                        ? ThemePalette.accent-secondary
+                                        : ThemePalette.bg-elevated;
+                                    Text {
+                                        text: "Bot Token";
+                                        color: root.auth-modal-mode == "bot_token" ? #FFFFFF : ThemePalette.text-primary;
+                                        font-size: 11px;
+                                        font-weight: 700;
+                                        horizontal-alignment: center;
+                                        vertical-alignment: center;
+                                        overflow: elide;
+                                    }
+                                    TouchArea {
+                                        mouse-cursor: pointer;
+                                        clicked => { root.switch-auth-modal-mode("bot_token"); }
+                                    }
+                                }
+
+                                if root.auth-modal-supports-signup : Rectangle {
+                                    horizontal-stretch: 1;
+                                    height: 26px;
+                                    y: 5px;
+                                    border-radius: 6px;
+                                    background: root.auth-modal-mode == "signup"
+                                        ? ThemePalette.status-online
+                                        : ThemePalette.bg-elevated;
+                                    Text {
+                                        text: "+ Registrati";
+                                        color: root.auth-modal-mode == "signup" ? #0E1621 : ThemePalette.text-primary;
+                                        font-size: 11px;
+                                        font-weight: 700;
+                                        horizontal-alignment: center;
+                                        vertical-alignment: center;
+                                        overflow: elide;
+                                    }
+                                    TouchArea {
+                                        mouse-cursor: pointer;
+                                        clicked => { root.switch-auth-modal-mode("signup"); }
+                                    }
+                                }
+                            }
+                        }
+
+                        // Telegram-Specific Backend Environment Selector (Public Production vs Test DC2)
+                        if root.auth-modal-protocol == "Telegram" : Rectangle {
+                            height: 36px;
+                            border-radius: 8px;
+                            background: ThemePalette.bg-tertiary;
+                            border-width: 1px;
+                            border-color: ThemePalette.border-subtle;
+
+                            HorizontalLayout {
+                                padding-left: 8px;
+                                padding-right: 8px;
+                                spacing: 6px;
+
+                                Rectangle {
+                                    horizontal-stretch: 1;
+                                    height: 26px;
+                                    y: 5px;
+                                    border-radius: 6px;
+                                    background: root.telegram-backend-mode == "public"
+                                        ? ThemePalette.accent-primary
+                                        : ThemePalette.bg-elevated;
+                                    Text {
+                                        text: "Server Pubblici (DC1–5)";
+                                        color: root.telegram-backend-mode == "public" ? #FFFFFF : ThemePalette.text-primary;
+                                        font-size: 11px;
+                                        font-weight: 700;
+                                        horizontal-alignment: center;
+                                        vertical-alignment: center;
+                                        overflow: elide;
+                                    }
+                                    TouchArea {
+                                        mouse-cursor: pointer;
+                                        clicked => { root.switch-telegram-backend-mode("public"); }
+                                    }
+                                }
+
+                                Rectangle {
+                                    horizontal-stretch: 1;
+                                    height: 26px;
+                                    y: 5px;
+                                    border-radius: 6px;
+                                    background: root.telegram-backend-mode == "test_dc2"
+                                        ? ThemePalette.status-warning
+                                        : ThemePalette.bg-elevated;
+                                    Text {
+                                        text: "Test DC2";
+                                        color: root.telegram-backend-mode == "test_dc2" ? #0E1621 : ThemePalette.text-primary;
+                                        font-size: 11px;
+                                        font-weight: 700;
+                                        horizontal-alignment: center;
+                                        vertical-alignment: center;
+                                        overflow: elide;
+                                    }
+                                    TouchArea {
+                                        mouse-cursor: pointer;
+                                        clicked => { root.switch-telegram-backend-mode("test_dc2"); }
+                                    }
+                                }
+                            }
+                        }
+
+                        Text {
+                            text: root.auth-modal-title;
+                            color: ThemePalette.accent-primary;
+                            font-size: 14px;
+                            font-weight: 700;
+                            wrap: word-wrap;
+                        }
+
+                        Text {
+                            text: root.auth-modal-description;
+                            color: ThemePalette.text-secondary;
+                            font-size: ThemePalette.font-size-small;
+                            wrap: word-wrap;
+                        }
+
+                        if root.auth-modal-qr-hint != "" : Rectangle {
+                            border-radius: 6px;
+                            background: ThemePalette.bg-tertiary;
+                            VerticalLayout {
+                                padding: 8px;
+                                Text {
+                                    text: "[QR] QR / SMP Queue Payload: " + root.auth-modal-qr-hint;
+                                    color: ThemePalette.status-online;
+                                    font-size: 11px;
+                                    wrap: word-wrap;
+                                }
+                            }
+                        }
+
+                        for field[idx] in root.auth-modal-fields : VerticalLayout {
+                            spacing: 4px;
+                            Text {
+                                text: field.label;
+                                color: ThemePalette.text-primary;
+                                font-size: ThemePalette.font-size-small;
+                                font-weight: 600;
+                                wrap: word-wrap;
+                            }
+                            Rectangle {
+                                height: 38px;
+                                border-radius: 8px;
+                                background: ThemePalette.bg-tertiary;
+                                border-width: 1px;
+                                border-color: (auth-field-input.has-focus || SuperTheme.mobile-keyboard-target == ("auth:" + field.key))
+                                    ? ThemePalette.accent-primary
+                                    : ThemePalette.border-subtle;
+
+                                HorizontalLayout {
+                                    padding-left: 10px;
+                                    padding-right: 10px;
+
+                                    Rectangle {
+                                        horizontal-stretch: 1;
+                                        clip: true;
+
+                                        if field.value == "" : Text {
+                                            width: parent.width;
+                                            height: parent.height;
+                                            text: field.placeholder;
+                                            color: ThemePalette.text-muted;
+                                            font-size: 12px;
+                                            vertical-alignment: center;
+                                            overflow: elide;
+                                        }
+
+                                        auth-field-input := TextInput {
+                                            width: parent.width;
+                                            height: parent.height;
+                                            text: field.value;
+                                            color: ThemePalette.text-primary;
+                                            font-size: 13px;
+                                            single-line: true;
+                                            input-type: field.is-secret ? InputType.password : InputType.text;
+                                            vertical-alignment: center;
+                                            edited => {
+                                                root.update-auth-field(field.key, self.text);
+                                            }
+                                        }
+
+                                        TouchArea {
+                                            mouse-cursor: text;
+                                            clicked => {
+                                                auth-field-input.focus();
+                                                SuperTheme.request-soft-keyboard("auth:" + field.key, field.label);
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        if root.auth-modal-status-text != "" : Rectangle {
+                            border-radius: 6px;
+                            background: ThemePalette.bg-tertiary;
+                            VerticalLayout {
+                                padding: 8px;
+                                Text {
+                                    text: root.auth-modal-status-text;
+                                    color: ThemePalette.status-online;
+                                    font-size: 11px;
+                                    font-weight: 600;
+                                    wrap: word-wrap;
+                                }
+                            }
+                        }
+
+                        // Submit Auth Button
+                        Rectangle {
+                            height: 44px;
+                            border-radius: 10px;
+                            background: submit-auth-touch.has-hover ? ThemePalette.accent-secondary : ThemePalette.accent-primary;
+                            Text {
+                                text: root.auth-modal-mode == "signup"
+                                    ? "+ Crea e Registra Nuovo Account"
+                                    : (root.auth-modal-mode == "bot_token"
+                                        ? "Connetti Bot (@BotFather)"
+                                        : "Accedi / Connetti Account");
+                                color: #FFFFFF;
+                                font-size: 13px;
+                                font-weight: 700;
+                                horizontal-alignment: center;
+                                vertical-alignment: center;
+                            }
+                            submit-auth-touch := TouchArea {
+                                mouse-cursor: pointer;
+                                clicked => { root.submit-auth-modal(); }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // =========================================================================
+    // 6. PEFL v1.0 Clause 3 Mandatory Foreground EULA Approval Modal
+    //    (100% Narrow-Screen & Safe-Area Compatible!)
+    // =========================================================================
+    if root.show-pefl-eula-modal : Rectangle {
+        width: 100%;
+        height: 100%;
+        background: #000000dd;
+
+        // Block all background clicks until user explicitly approves PEFL v1.0
+        TouchArea {}
+
+        Rectangle {
+            width: (SuperTheme.is-mobile-compact || root.width < 640px)
+                ? (root.width - 16px)
+                : Math.min(760px, root.width - 32px);
+            height: (SuperTheme.is-mobile-compact || root.height < 680px)
+                ? (root.height - SuperTheme.safe-area-top - SuperTheme.safe-area-bottom - 16px)
+                : Math.min(600px, root.height - SuperTheme.safe-area-top - SuperTheme.safe-area-bottom - 32px);
+            x: (parent.width - self.width) / 2;
+            y: SuperTheme.safe-area-top + ((root.height - SuperTheme.safe-area-top - SuperTheme.safe-area-bottom) - self.height) / 2;
+            border-radius: 14px;
+            background: ThemePalette.bg-secondary;
+            border-width: 2px;
+            border-color: ThemePalette.status-warning;
+            clip: true;
+
+            VerticalLayout {
+                padding: SuperTheme.is-mobile-compact ? 14px : 20px;
+                spacing: 10px;
+
+                HorizontalLayout {
+                    spacing: 10px;
+
+                    // PEFL Header Badge ("PEFL" 14px bold)
+                    Rectangle {
+                        width: 48px;
+                        height: 36px;
+                        y: (parent.height - self.height) / 2;
+                        border-radius: 8px;
+                        background: ThemePalette.status-warning;
+
+                        Text {
+                            text: "PEFL";
+                            color: #0E1621;
+                            font-size: 14px;
+                            font-weight: 800;
+                            horizontal-alignment: center;
+                            vertical-alignment: center;
+                        }
+                    }
+
+                    VerticalLayout {
+                        horizontal-stretch: 1;
+                        spacing: 3px;
+                        Text {
+                            text: "Licenza PEFL v1.0 — Approvazione Obbligatoria";
+                            color: ThemePalette.status-warning;
+                            font-size: SuperTheme.is-mobile-compact ? 14px : 16px;
+                            font-weight: 700;
+                            wrap: word-wrap;
+                        }
+                        Text {
+                            text: "Copyright (c) 2026 Rubens Rainelli • rubens@rainelli.it";
+                            color: ThemePalette.text-primary;
+                            font-size: 11px;
+                            font-weight: 600;
+                            wrap: word-wrap;
+                        }
+                    }
+
+                    // Language Switcher (IT / EN)
+                    Rectangle {
+                        width: 44px;
+                        height: 28px;
+                        border-radius: 6px;
+                        background: root.pefl-license-lang == "IT"
+                            ? ThemePalette.accent-primary
+                            : ThemePalette.bg-elevated;
+                        Text {
+                            text: "IT";
+                            color: ThemePalette.text-primary;
+                            font-size: 11px;
+                            font-weight: 700;
+                            horizontal-alignment: center;
+                            vertical-alignment: center;
+                        }
+                        TouchArea {
+                            mouse-cursor: pointer;
+                            clicked => { root.switch-pefl-lang("IT"); }
+                        }
+                    }
+
+                    Rectangle {
+                        width: 44px;
+                        height: 28px;
+                        border-radius: 6px;
+                        background: root.pefl-license-lang == "EN"
+                            ? ThemePalette.accent-primary
+                            : ThemePalette.bg-elevated;
+                        Text {
+                            text: "EN";
+                            color: ThemePalette.text-primary;
+                            font-size: 11px;
+                            font-weight: 700;
+                            horizontal-alignment: center;
+                            vertical-alignment: center;
+                        }
+                        TouchArea {
+                            mouse-cursor: pointer;
+                            clicked => { root.switch-pefl-lang("EN"); }
+                        }
+                    }
+                }
+
+                // Scrollable Verbatim License Box
+                Rectangle {
+                    vertical-stretch: 1;
+                    border-radius: 8px;
+                    background: ThemePalette.bg-primary;
+                    border-width: 1px;
+                    border-color: ThemePalette.border-subtle;
+
+                    ScrollView {
+                        mouse-drag-pan-enabled: true;
+                        horizontal-scrollbar-policy: always-off;
+
+                        VerticalLayout {
+                            width: parent.visible-width;
+                            padding: 12px;
+                            alignment: start;
+
+                            Text {
+                                text: root.pefl-license-text;
+                                color: ThemePalette.text-primary;
+                                font-size: 12px;
+                                wrap: word-wrap;
+                            }
+                        }
+                    }
+                }
+
+                // 7-Day Persistence Option (Clause 3)
+                Rectangle {
+                    height: 36px;
+                    border-radius: 6px;
+                    background: ThemePalette.bg-tertiary;
+                    HorizontalLayout {
+                        padding-left: 10px;
+                        padding-right: 10px;
+                        spacing: 8px;
+                        Text {
+                            text: root.pefl-remember-7-days
+                                ? "[x] Memorizza l'approvazione per 7 giorni (Clausola 3)"
+                                : "[ ] Richiedi l'approvazione ad ogni singolo avvio";
+                            color: ThemePalette.text-primary;
+                            font-size: 11px;
+                            vertical-alignment: center;
+                            overflow: elide;
+                        }
+                    }
+                    TouchArea {
+                        mouse-cursor: pointer;
+                        clicked => {
+                            root.pefl-remember-7-days = !root.pefl-remember-7-days;
+                        }
+                    }
+                }
+
+                // Explicit Approval / Decline Buttons (100% Responsive — Never overflows narrow phones!)
+                HorizontalLayout {
+                    spacing: 8px;
+
+                    Rectangle {
+                        horizontal-stretch: 1;
+                        height: 40px;
+                        border-radius: 8px;
+                        background: ThemePalette.status-danger;
+                        Text {
+                            text: SuperTheme.is-mobile-compact ? "× Rifiuta" : "× Rifiuta ed Esci";
+                            color: ThemePalette.text-primary;
+                            font-size: 12px;
+                            font-weight: 700;
+                            horizontal-alignment: center;
+                            vertical-alignment: center;
+                        }
+                        TouchArea {
+                            mouse-cursor: pointer;
+                            clicked => {
+                                root.decline-pefl-eula();
+                            }
+                        }
+                    }
+
+                    Rectangle {
+                        horizontal-stretch: 2;
+                        height: 40px;
+                        border-radius: 8px;
+                        background: ThemePalette.status-online;
+                        Text {
+                            text: SuperTheme.is-mobile-compact
+                                ? "✓ Approvo e Accetto PEFL v1.0"
+                                : "✓ Approvo e Accetto i Termini PEFL v1.0 (Uso Privato)";
+                            color: #0E1621;
+                            font-size: 12px;
+                            font-weight: 700;
+                            horizontal-alignment: center;
+                            vertical-alignment: center;
+                            overflow: elide;
+                        }
+                        TouchArea {
+                            mouse-cursor: pointer;
+                            clicked => {
+                                root.accept-pefl-eula(root.pefl-remember-7-days);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // =========================================================================
+    // 7. Global Left-Edge Swipe-Back Gesture Detector (Works across Modals & Chat!)
+    // =========================================================================
+    if !root.show-pefl-eula-modal && (root.show-auth-modal || root.show-protocol-picker-modal || root.show-settings-modal || root.show-new-chat-modal || (SuperTheme.is-mobile-compact && SuperTheme.mobile-showing-chat)) : Rectangle {
+        x: 0px;
+        y: SuperTheme.safe-area-top + 56px;
+        width: 22px;
+        height: root.height - SuperTheme.safe-area-top - SuperTheme.safe-area-bottom - 112px;
+        background: transparent;
+
+        TouchArea {
+            pointer-event(event) => {
+                if (event.kind == PointerEventKind.down) {
+                    root.global-edge-swipe-triggered = false;
+                }
+            }
+            moved => {
+                if (self.pressed && !root.global-edge-swipe-triggered) {
+                    if ((self.mouse-x - self.pressed-x) > 50px && Math.abs(self.mouse-y - self.pressed-y) < 48px) {
+                        root.global-edge-swipe-triggered = true;
+                        root.handle-back-navigation();
+                    }
+                }
+            }
+        }
+    }
+
+    // =========================================================================
+    // 8. Built-In Compact Mobile Touch Keyboard Drawer (Top Z-Order Overlay)
+    //    Always sits cleanly above the Android bottom bar and above all modals!
+    // =========================================================================
+    if SuperTheme.is-mobile-compact && SuperTheme.mobile-keyboard-open : Rectangle {
+        x: 0px;
+        y: root.height - SuperTheme.safe-area-bottom - 196px;
+        width: 100%;
+        height: 196px;
+        background: SuperTheme.surface-bg;
+        border-width: 1px;
+        border-color: SuperTheme.border-color;
+
+        // Absorb touches so background views behind the keyboard aren't clicked
+        TouchArea {}
+
+        VerticalLayout {
+            padding: 4px;
+            spacing: 4px;
+
+            // Top Bar (28px height): Active Field Label + "Pulisci" + "Chiudi ✓"
+            Rectangle {
+                height: 28px;
+                border-radius: 6px;
+                background: ThemePalette.bg-tertiary;
+
+                HorizontalLayout {
+                    padding-left: 8px;
+                    padding-right: 6px;
+                    spacing: 6px;
+
+                    Text {
+                        text: "✎ " + (SuperTheme.mobile-keyboard-label != "" ? SuperTheme.mobile-keyboard-label : "Inserimento testo");
+                        color: ThemePalette.accent-primary;
+                        font-size: 11px;
+                        font-weight: 700;
+                        horizontal-stretch: 1;
+                        vertical-alignment: center;
+                        overflow: elide;
+                    }
+
+                    Rectangle {
+                        width: 54px;
+                        height: 22px;
+                        y: 3px;
+                        border-radius: 5px;
+                        background: kb-clear-touch.has-hover ? ThemePalette.status-warning : ThemePalette.bg-elevated;
+
+                        Text {
+                            text: "Pulisci";
+                            color: kb-clear-touch.has-hover ? #0E1621 : ThemePalette.text-secondary;
+                            font-size: 10px;
+                            font-weight: 700;
+                            horizontal-alignment: center;
+                            vertical-alignment: center;
+                        }
+
+                        kb-clear-touch := TouchArea {
+                            mouse-cursor: pointer;
+                            clicked => {
+                                SuperTheme.mobile-key-tap("CLEAR");
+                            }
+                        }
+                    }
+
+                    Rectangle {
+                        width: 64px;
+                        height: 22px;
+                        y: 3px;
+                        border-radius: 5px;
+                        background: kb-close-touch.has-hover ? ThemePalette.accent-secondary : ThemePalette.accent-primary;
+
+                        Text {
+                            text: "Chiudi ✓";
+                            color: #FFFFFF;
+                            font-size: 10px;
+                            font-weight: 700;
+                            horizontal-alignment: center;
+                            vertical-alignment: center;
+                        }
+
+                        kb-close-touch := TouchArea {
+                            mouse-cursor: pointer;
+                            clicked => {
+                                SuperTheme.hide-soft-keyboard();
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Row 1: Numbers or Symbols
+            HorizontalLayout {
+                spacing: 4px;
+                for k in (SuperTheme.mobile-keyboard-symbols
+                    ? ["+", "@", "#", "_", "-", ":", "/", ".", ",", "?"]
+                    : ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0"]) : Rectangle {
+                    horizontal-stretch: 1;
+                    height: 28px;
+                    border-radius: 5px;
+                    background: r1-touch.pressed ? ThemePalette.accent-primary : ThemePalette.bg-elevated;
+                    border-width: 1px;
+                    border-color: ThemePalette.border-subtle;
+
+                    Text {
+                        text: k;
+                        color: r1-touch.pressed ? #FFFFFF : ThemePalette.text-primary;
+                        font-size: 12px;
+                        font-weight: 700;
+                        horizontal-alignment: center;
+                        vertical-alignment: center;
+                    }
+
+                    r1-touch := TouchArea {
+                        mouse-cursor: pointer;
+                        clicked => {
+                            SuperTheme.mobile-key-tap(k);
+                        }
+                    }
+                }
+            }
+
+            // Row 2: QWERTYUIOP
+            HorizontalLayout {
+                spacing: 4px;
+                for k in (SuperTheme.mobile-keyboard-shift
+                    ? ["Q", "W", "E", "R", "T", "Y", "U", "I", "O", "P"]
+                    : ["q", "w", "e", "r", "t", "y", "u", "i", "o", "p"]) : Rectangle {
+                    horizontal-stretch: 1;
+                    height: 28px;
+                    border-radius: 5px;
+                    background: r2-touch.pressed ? ThemePalette.accent-primary : ThemePalette.bg-elevated;
+                    border-width: 1px;
+                    border-color: ThemePalette.border-subtle;
+
+                    Text {
+                        text: k;
+                        color: r2-touch.pressed ? #FFFFFF : ThemePalette.text-primary;
+                        font-size: 12px;
+                        font-weight: 700;
+                        horizontal-alignment: center;
+                        vertical-alignment: center;
+                    }
+
+                    r2-touch := TouchArea {
+                        mouse-cursor: pointer;
+                        clicked => {
+                            SuperTheme.mobile-key-tap(k);
+                        }
+                    }
+                }
+            }
+
+            // Row 3: ASDFGHJKL@
+            HorizontalLayout {
+                spacing: 4px;
+                for k in (SuperTheme.mobile-keyboard-shift
+                    ? ["A", "S", "D", "F", "G", "H", "J", "K", "L", "@"]
+                    : ["a", "s", "d", "f", "g", "h", "j", "k", "l", "@"]) : Rectangle {
+                    horizontal-stretch: 1;
+                    height: 28px;
+                    border-radius: 5px;
+                    background: r3-touch.pressed ? ThemePalette.accent-primary : ThemePalette.bg-elevated;
+                    border-width: 1px;
+                    border-color: ThemePalette.border-subtle;
+
+                    Text {
+                        text: k;
+                        color: r3-touch.pressed ? #FFFFFF : ThemePalette.text-primary;
+                        font-size: 12px;
+                        font-weight: 700;
+                        horizontal-alignment: center;
+                        vertical-alignment: center;
+                    }
+
+                    r3-touch := TouchArea {
+                        mouse-cursor: pointer;
+                        clicked => {
+                            SuperTheme.mobile-key-tap(k);
+                        }
+                    }
+                }
+            }
+
+            // Row 4: Shift + ZXCVBNM. + Backspace
+            HorizontalLayout {
+                spacing: 4px;
+
+                // Shift Toggle
+                Rectangle {
+                    width: 36px;
+                    height: 28px;
+                    border-radius: 5px;
+                    background: SuperTheme.mobile-keyboard-shift ? ThemePalette.accent-primary : ThemePalette.bg-tertiary;
+                    border-width: 1px;
+                    border-color: ThemePalette.border-subtle;
+
+                    Text {
+                        text: "↑";
+                        color: SuperTheme.mobile-keyboard-shift ? #FFFFFF : ThemePalette.text-primary;
+                        font-size: 13px;
+                        font-weight: 800;
+                        horizontal-alignment: center;
+                        vertical-alignment: center;
+                    }
+
+                    TouchArea {
+                        mouse-cursor: pointer;
+                        clicked => {
+                            SuperTheme.mobile-keyboard-shift = !SuperTheme.mobile-keyboard-shift;
+                        }
+                    }
+                }
+
+                for k in (SuperTheme.mobile-keyboard-shift
+                    ? ["Z", "X", "C", "V", "B", "N", "M", "."]
+                    : ["z", "x", "c", "v", "b", "n", "m", "."]) : Rectangle {
+                    horizontal-stretch: 1;
+                    height: 28px;
+                    border-radius: 5px;
+                    background: r4-touch.pressed ? ThemePalette.accent-primary : ThemePalette.bg-elevated;
+                    border-width: 1px;
+                    border-color: ThemePalette.border-subtle;
+
+                    Text {
+                        text: k;
+                        color: r4-touch.pressed ? #FFFFFF : ThemePalette.text-primary;
+                        font-size: 12px;
+                        font-weight: 700;
+                        horizontal-alignment: center;
+                        vertical-alignment: center;
+                    }
+
+                    r4-touch := TouchArea {
+                        mouse-cursor: pointer;
+                        clicked => {
+                            SuperTheme.mobile-key-tap(k);
+                        }
+                    }
+                }
+
+                // Backspace
+                Rectangle {
+                    width: 42px;
+                    height: 28px;
+                    border-radius: 5px;
+                    background: bksp-touch.pressed ? ThemePalette.status-danger : ThemePalette.bg-tertiary;
+                    border-width: 1px;
+                    border-color: ThemePalette.border-subtle;
+
+                    Text {
+                        text: "←";
+                        color: bksp-touch.pressed ? #FFFFFF : ThemePalette.text-primary;
+                        font-size: 13px;
+                        font-weight: 800;
+                        horizontal-alignment: center;
+                        vertical-alignment: center;
+                    }
+
+                    bksp-touch := TouchArea {
+                        mouse-cursor: pointer;
+                        clicked => {
+                            SuperTheme.mobile-key-tap("BACKSPACE");
+                        }
+                    }
+                }
+            }
+
+            // Row 5: ?123/ABC + "+" + "_" + Spacebar + "/" + ":" + "OK ✓"
+            HorizontalLayout {
+                spacing: 4px;
+
+                Rectangle {
+                    width: 42px;
+                    height: 28px;
+                    border-radius: 5px;
+                    background: SuperTheme.mobile-keyboard-symbols ? ThemePalette.accent-primary : ThemePalette.bg-tertiary;
+                    border-width: 1px;
+                    border-color: ThemePalette.border-subtle;
+
+                    Text {
+                        text: SuperTheme.mobile-keyboard-symbols ? "ABC" : "?123";
+                        color: SuperTheme.mobile-keyboard-symbols ? #FFFFFF : ThemePalette.text-primary;
+                        font-size: 10px;
+                        font-weight: 700;
+                        horizontal-alignment: center;
+                        vertical-alignment: center;
+                    }
+
+                    TouchArea {
+                        mouse-cursor: pointer;
+                        clicked => {
+                            SuperTheme.mobile-keyboard-symbols = !SuperTheme.mobile-keyboard-symbols;
+                        }
+                    }
+                }
+
+                for sym in ["+", "_"] : Rectangle {
+                    width: 28px;
+                    height: 28px;
+                    border-radius: 5px;
+                    background: sym-l-touch.pressed ? ThemePalette.accent-primary : ThemePalette.bg-elevated;
+                    border-width: 1px;
+                    border-color: ThemePalette.border-subtle;
+
+                    Text {
+                        text: sym;
+                        color: ThemePalette.text-primary;
+                        font-size: 12px;
+                        font-weight: 700;
+                        horizontal-alignment: center;
+                        vertical-alignment: center;
+                    }
+
+                    sym-l-touch := TouchArea {
+                        mouse-cursor: pointer;
+                        clicked => {
+                            SuperTheme.mobile-key-tap(sym);
+                        }
+                    }
+                }
+
+                // Spacebar
+                Rectangle {
+                    horizontal-stretch: 1;
+                    height: 28px;
+                    border-radius: 5px;
+                    background: space-touch.pressed ? ThemePalette.accent-primary : ThemePalette.bg-elevated;
+                    border-width: 1px;
+                    border-color: ThemePalette.border-subtle;
+
+                    Text {
+                        text: "Spazio";
+                        color: ThemePalette.text-secondary;
+                        font-size: 11px;
+                        font-weight: 600;
+                        horizontal-alignment: center;
+                        vertical-alignment: center;
+                    }
+
+                    space-touch := TouchArea {
+                        mouse-cursor: pointer;
+                        clicked => {
+                            SuperTheme.mobile-key-tap(" ");
+                        }
+                    }
+                }
+
+                for sym2 in ["/", ":"] : Rectangle {
+                    width: 28px;
+                    height: 28px;
+                    border-radius: 5px;
+                    background: sym-r-touch.pressed ? ThemePalette.accent-primary : ThemePalette.bg-elevated;
+                    border-width: 1px;
+                    border-color: ThemePalette.border-subtle;
+
+                    Text {
+                        text: sym2;
+                        color: ThemePalette.text-primary;
+                        font-size: 12px;
+                        font-weight: 700;
+                        horizontal-alignment: center;
+                        vertical-alignment: center;
+                    }
+
+                    sym-r-touch := TouchArea {
+                        mouse-cursor: pointer;
+                        clicked => {
+                            SuperTheme.mobile-key-tap(sym2);
+                        }
+                    }
+                }
+
+                // Action / Enter Key ("OK ✓")
+                Rectangle {
+                    width: 52px;
+                    height: 28px;
+                    border-radius: 5px;
+                    background: enter-touch.pressed ? ThemePalette.accent-secondary : ThemePalette.status-online;
+
+                    Text {
+                        text: "OK ✓";
+                        color: #0E1621;
+                        font-size: 11px;
+                        font-weight: 800;
+                        horizontal-alignment: center;
+                        vertical-alignment: center;
+                    }
+
+                    enter-touch := TouchArea {
+                        mouse-cursor: pointer;
+                        clicked => {
+                            SuperTheme.mobile-key-tap("ENTER");
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

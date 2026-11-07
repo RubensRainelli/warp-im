@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Personal and Educational Free License (PEF License / PEFL)
+  Version 1.0 - 2026-05-26
+  Copyright (c) 2026 Rubens Rainelli (rubens@rainelli.it)
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">
+  <defs>
+    <linearGradient id="warpBg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0F172A"/>
+      <stop offset="50%" stop-color="#1E1B4B"/>
+      <stop offset="100%" stop-color="#090D16"/>
+    </linearGradient>
+    <linearGradient id="warpAccent" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#38BDF8"/>
+      <stop offset="50%" stop-color="#818CF8"/>
+      <stop offset="100%" stop-color="#C084FC"/>
+    </linearGradient>
+  </defs>
+  <rect x="12" y="12" width="232" height="232" rx="56" fill="url(#warpBg)" stroke="url(#warpAccent)" stroke-width="6"/>
+  <circle cx="128" cy="128" r="78" fill="none" stroke="url(#warpAccent)" stroke-width="4" stroke-dasharray="12 8" opacity="0.55"/>
+  <path d="M58 86 L92 172 L128 106 L164 172 L198 86" fill="none" stroke="url(#warpAccent)" stroke-width="18" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="58" cy="86" r="9" fill="#38BDF8"/>
+  <circle cx="128" cy="106" r="9" fill="#818CF8"/>
+  <circle cx="198" cy="86" r="9" fill="#C084FC"/>
+</svg>

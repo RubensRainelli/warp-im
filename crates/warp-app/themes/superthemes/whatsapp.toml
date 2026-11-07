@@ -1,0 +1,19 @@
+# Personal and Educational Free License (PEF License / PEFL)
+# Version 1.0 - 2026-05-26
+# Copyright (c) 2026 Rubens Rainelli
+
+id = "whatsapp"
+name = "WhatsApp Minimal Tabs"
+description = "Minimalist category filter pills with sharp-corner split bubbles, E2EE status header, and floating pill input bar."
+
+navigation_layout = "MinimalistTabs"
+message_layout = "SplitBubbles"
+reaction_style = "FloatingRight"
+
+enable_swipe_to_reply = true
+show_protocol_badge = false
+compact_timestamps = false
+sidebar_width_px = 310
+server_rail_width_px = 0
+bubble_corner_radius_px = 12
+avatar_size_px = 42

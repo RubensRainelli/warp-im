@@ -1,0 +1,19 @@
+# Personal and Educational Free License (PEF License / PEFL)
+# Version 1.0 - 2026-05-26
+# Copyright (c) 2026 Rubens Rainelli (rubens@rainelli.it)
+
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=Warp IM
+GenericName=Universal Multi-Protocol Messenger
+GenericName[it]=Messaggistica Universale Multi-Protocollo
+Comment=Ultra-low-memory native messenger unifying Telegram, Matrix, XMPP, Nostr, SimpleX, IRCv3, Stoat, and Mattermost (PEFL v1.0)
+Comment[it]=Client nativo ultra-leggero che unifica Telegram, Matrix, XMPP, Nostr, SimpleX, IRCv3, Stoat e Mattermost (PEFL v1.0)
+Exec=warp-im %u
+Icon=warp-im
+Terminal=false
+Categories=Network;InstantMessaging;Chat;
+Keywords=Telegram;Matrix;XMPP;Nostr;SimpleX;IRC;Stoat;Mattermost;Chat;Messenger;PEFL;
+StartupNotify=true
+StartupWMClass=warp-im

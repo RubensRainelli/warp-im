@@ -1,0 +1,19 @@
+# Personal and Educational Free License (PEF License / PEFL)
+# Version 1.0 - 2026-05-26
+# Copyright (c) 2026 Rubens Rainelli
+
+id = "telegram"
+name = "Telegram Unified Folders"
+description = "Unified inbox with horizontal granular folder tabs, rounded curved chat bubbles, and inside-bubble reactions."
+
+navigation_layout = "HorizontalFolders"
+message_layout = "CurvedBubbles"
+reaction_style = "InsideBubbleCorner"
+
+enable_swipe_to_reply = true
+show_protocol_badge = true
+compact_timestamps = false
+sidebar_width_px = 320
+server_rail_width_px = 0
+bubble_corner_radius_px = 14
+avatar_size_px = 40

@@ -1,0 +1,22 @@
+id = "night_telegram"
+name = "Night Telegram"
+font_family = "Inter"
+font_size_base = 14
+font_size_small = 11
+
+bg_primary = "#0E1621"
+bg_secondary = "#17212B"
+bg_tertiary = "#242F3D"
+bg_elevated = "#1F2936"
+bubble_outgoing = "#2B5278"
+bubble_incoming = "#182533"
+text_primary = "#F5F5F5"
+text_secondary = "#7F91A4"
+text_muted = "#5B6B7C"
+accent_primary = "#5288C1"
+accent_secondary = "#3E6EA2"
+border_subtle = "#101924"
+status_online = "#4ECC5E"
+status_warning = "#F5A623"
+status_danger = "#E53935"
+surface_opacity = 1.0

@@ -1,0 +1,28 @@
+# Personal and Educational Free License (PEF License / PEFL)
+# Version 1.0 - 2026-05-26
+# Copyright (c) 2026 Rubens Rainelli
+
+id = "oled"
+name = "🖤 OLED (True Black)"
+font_family = "Inter"
+font_size_base = 14
+font_size_small = 11
+
+bg_primary = "#000000"
+bg_secondary = "#050507"
+bg_tertiary = "#0C0C10"
+bg_elevated = "#121218"
+bubble_outgoing = "#143652"
+bubble_incoming = "#0B0B10"
+text_primary = "#FFFFFF"
+text_secondary = "#9CA3AF"
+text_muted = "#6B7280"
+accent_primary = "#38BDF8"
+accent_secondary = "#10B981"
+border_subtle = "#181820"
+status_online = "#10B981"
+status_warning = "#FBBF24"
+status_danger = "#EF4444"
+surface_opacity = 1.0
+is_light_mode = false
+is_oled_mode = true

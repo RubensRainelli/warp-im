@@ -1,0 +1,349 @@
+# Personal and Educational Free License (PEF License / PEFL)
+# Version 1.0 - 2026-05-26
+# Copyright (c) 2026 Rubens Rainelli
+#
+# Contact Details:
+#   Email: rubens@rainelli.it
+#   GitHub: https://github.com/RubensRainelli/
+#   Tel: (+39) 342 811 5882
+#
+# Personal and educational free use permitted.
+# Corporate, business or enterprise use prohibited without written authorization and fee.
+# The full license can be found in the LICENSE file.
+
+name: Warp IM — Multi-Platform Release Packaging
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+    inputs:
+      release_version:
+        description: 'Release version string (e.g. 0.1.0)'
+        required: false
+        default: '0.1.0'
+
+permissions:
+  contents: write
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  # ============================================================================
+  # 1, 2, 3. LINUX PACKAGES: Clean Sources (.tar.gz), Debian (.deb), AppImage
+  # ============================================================================
+  package-linux:
+    name: "🐧 Linux (.deb + .AppImage + Sources .tar.gz)"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Determine Version
+        id: vars
+        run: |
+          if [[ "${GITHUB_REF:-}" == refs/tags/v* ]]; then
+            VER="${GITHUB_REF#refs/tags/v}"
+          else
+            VER="${{ github.event.inputs.release_version || '0.1.0' }}"
+          fi
+          echo "version=${VER}" >> "$GITHUB_OUTPUT"
+
+      - name: Install Dependencies & AppImageTool
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            pkg-config \
+            libfontconfig1-dev \
+            libfreetype6-dev \
+            libxkbcommon-dev \
+            libxcb-shape0-dev \
+            libxcb-xfixes0-dev \
+            libgl1-mesa-dev \
+            file \
+            desktop-file-utils \
+            wget \
+            libfuse2
+          wget -q https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage -O /usr/local/bin/appimagetool
+          chmod +x /usr/local/bin/appimagetool
+
+      - name: Install Rust Toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust Cache
+        uses: Swatinem/rust-cache@v2
+
+      - name: Build Linux Release Packages (.deb, AppImage, linux-sources.tar.gz)
+        env:
+          ARCH: x86_64
+          APPIMAGETOOL_APPIMAGE_EXTRACT_AND_RUN: 1
+        run: |
+          chmod +x scripts/package-linux.sh
+          ./scripts/package-linux.sh --version "${{ steps.vars.outputs.version }}" --build-appimage
+          ls -lh dist/linux/
+
+      - name: Upload Linux Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: warp-im-linux-packages
+          path: |
+            dist/linux/*.tar.gz
+            dist/linux/*.deb
+            dist/linux/*.AppImage
+            dist/linux/SHA256SUMS*
+
+  # ============================================================================
+  # 4. WINDOWS NATIVE (x86_64-pc-windows-msvc .zip + Installer Bundle)
+  # ============================================================================
+  package-windows:
+    name: "🪟 Windows Native (x86_64-pc-windows-msvc)"
+    runs-on: windows-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Determine Version
+        id: vars
+        shell: bash
+        run: |
+          if [[ "${GITHUB_REF:-}" == refs/tags/v* ]]; then
+            VER="${GITHUB_REF#refs/tags/v}"
+          else
+            VER="${{ github.event.inputs.release_version || '0.1.0' }}"
+          fi
+          echo "version=${VER}" >> "$GITHUB_OUTPUT"
+
+      - name: Install Rust Toolchain (x86_64-pc-windows-msvc)
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc
+
+      - name: Rust Cache
+        uses: Swatinem/rust-cache@v2
+
+      - name: Build Windows Release Binary
+        run: cargo build --release --target x86_64-pc-windows-msvc -p warp-app
+
+      - name: Assemble Windows Release Bundle & Portable Installer Archive
+        shell: bash
+        run: |
+          set -euo pipefail
+          VER="${{ steps.vars.outputs.version }}"
+          STAGE="dist/windows/warp-im-${VER}-windows-x86_64"
+          mkdir -p "${STAGE}"
+          cp target/x86_64-pc-windows-msvc/release/warp-app.exe "${STAGE}/warp-im.exe"
+          cp target/x86_64-pc-windows-msvc/release/warp-app.exe "${STAGE}/warp-app.exe"
+          cp LICENSE LICENSE.it NOTICE.md README.md README.it.md "${STAGE}/"
+          cp -r themes "${STAGE}/themes"
+          cp -r docs "${STAGE}/docs"
+
+          cat > "${STAGE}/Install-WarpIM.ps1" << 'EOF'
+          # PEFL v1.0 — Warp IM Local User Installer for Windows
+          $InstallDir = Join-Path $env:LOCALAPPDATA "Programs\WarpIM"
+          New-Item -ItemType Directory -Force -Path $InstallDir | Out-Null
+          Copy-Item -Path "$PSScriptRoot\*" -Destination $InstallDir -Recurse -Force
+          Write-Host "Warp IM installed under $InstallDir (PEFL v1.0 - Copyright (c) 2026 Rubens Rainelli)"
+          EOF
+
+          mkdir -p dist/windows/out
+          (cd dist/windows && 7z a -tzip "out/warp-im-${VER}-windows-x86_64.zip" "warp-im-${VER}-windows-x86_64")
+          sha256sum "dist/windows/out/warp-im-${VER}-windows-x86_64.zip" > "dist/windows/out/warp-im-${VER}-windows-x86_64.zip.sha256"
+
+      - name: Upload Windows Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: warp-im-windows-packages
+          path: dist/windows/out/*
+
+  # ============================================================================
+  # 5 & 7. APPLE NATIVE: macOS Universal (.app + .dmg) & iOS (aarch64 staticlib)
+  # ============================================================================
+  package-macos:
+    name: "🍎 macOS Universal (.dmg) + 📱 iOS Native (aarch64)"
+    runs-on: macos-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Determine Version
+        id: vars
+        run: |
+          if [[ "${GITHUB_REF:-}" == refs/tags/v* ]]; then
+            VER="${GITHUB_REF#refs/tags/v}"
+          else
+            VER="${{ github.event.inputs.release_version || '0.1.0' }}"
+          fi
+          echo "version=${VER}" >> "$GITHUB_OUTPUT"
+
+      - name: Install Rust Apple Targets (macOS Universal + iOS)
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin,x86_64-apple-darwin,aarch64-apple-ios,aarch64-apple-ios-sim
+
+      - name: Rust Cache
+        uses: Swatinem/rust-cache@v2
+
+      - name: Build Universal macOS Binary & .dmg
+        run: |
+          set -euo pipefail
+          VER="${{ steps.vars.outputs.version }}"
+          cargo build --release --target aarch64-apple-darwin -p warp-app
+          cargo build --release --target x86_64-apple-darwin -p warp-app
+
+          APP_DIR="dist/macos/dmg-root/Warp IM.app"
+          mkdir -p "${APP_DIR}/Contents/MacOS"
+          mkdir -p "${APP_DIR}/Contents/Resources"
+
+          lipo -create \
+            target/aarch64-apple-darwin/release/warp-app \
+            target/x86_64-apple-darwin/release/warp-app \
+            -output "${APP_DIR}/Contents/MacOS/warp-im"
+          chmod +x "${APP_DIR}/Contents/MacOS/warp-im"
+
+          sed "s/{{VERSION}}/${VER}/g" packaging/macos/Info.plist > "${APP_DIR}/Contents/Info.plist"
+          cp LICENSE LICENSE.it NOTICE.md "${APP_DIR}/Contents/Resources/"
+          cp packaging/linux/warp-im.svg "${APP_DIR}/Contents/Resources/warp-im.svg"
+          cp -r themes "${APP_DIR}/Contents/Resources/themes"
+
+          ln -sf /Applications "dist/macos/dmg-root/Applications"
+          mkdir -p dist/macos/out
+          hdiutil create -volname "Warp IM ${VER}" \
+            -srcfolder "dist/macos/dmg-root" \
+            -ov -format UDZO \
+            "dist/macos/out/Warp-IM-${VER}-macos-universal.dmg"
+          shasum -a 256 "dist/macos/out/Warp-IM-${VER}-macos-universal.dmg" > "dist/macos/out/Warp-IM-${VER}-macos-universal.dmg.sha256"
+
+      - name: Build iOS Static Libraries & Bundle Metadata
+        run: |
+          set -euo pipefail
+          VER="${{ steps.vars.outputs.version }}"
+          cargo build --release --target aarch64-apple-ios --lib -p warp-app
+          cargo build --release --target aarch64-apple-ios-sim --lib -p warp-app
+
+          STAGE="dist/ios/warp-im-ios-aarch64"
+          mkdir -p "${STAGE}/device" "${STAGE}/simulator"
+          cp target/aarch64-apple-ios/release/libwarp_app.a "${STAGE}/device/libwarp_app.a"
+          cp target/aarch64-apple-ios-sim/release/libwarp_app.a "${STAGE}/simulator/libwarp_app.a"
+          sed "s/{{VERSION}}/${VER}/g" packaging/ios/Info.plist > "${STAGE}/Info.plist"
+          cp LICENSE LICENSE.it NOTICE.md "${STAGE}/"
+          cp -r themes "${STAGE}/themes"
+
+          mkdir -p dist/ios/out
+          tar -czf "dist/ios/out/libwarp_app_ios_aarch64.tar.gz" -C dist/ios "warp-im-ios-aarch64"
+          shasum -a 256 "dist/ios/out/libwarp_app_ios_aarch64.tar.gz" > "dist/ios/out/libwarp_app_ios_aarch64.tar.gz.sha256"
+
+      - name: Upload macOS & iOS Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: warp-im-apple-packages
+          path: |
+            dist/macos/out/*
+            dist/ios/out/*
+
+  # ============================================================================
+  # 6. ANDROID NATIVE (Signed & Zipaligned .apk + arm64-v8a cdylib)
+  # ============================================================================
+  package-android:
+    name: "🤖 Android Native (Signed .apk arm64-v8a)"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Determine Version
+        id: vars
+        run: |
+          if [[ "${GITHUB_REF:-}" == refs/tags/v* ]]; then
+            VER="${GITHUB_REF#refs/tags/v}"
+          else
+            VER="${{ github.event.inputs.release_version || '0.1.0' }}"
+          fi
+          echo "version=${VER}" >> "$GITHUB_OUTPUT"
+
+      - name: Install Rust Android Target & cargo-ndk
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android
+
+      - name: Rust Cache
+        uses: Swatinem/rust-cache@v2
+
+      - name: Install cargo-ndk
+        run: cargo install cargo-ndk --locked
+
+      - name: Build Android Native Library & Package Signed .apk (arm64-v8a)
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          VER="${{ steps.vars.outputs.version }}"
+          cargo ndk -t arm64-v8a build --release --lib -p warp-app
+
+          STAGE="dist/android/warp-im-android-arm64-v8a"
+          mkdir -p "${STAGE}/jniLibs/arm64-v8a"
+          cp target/aarch64-linux-android/release/libwarp_app.so "${STAGE}/jniLibs/arm64-v8a/"
+          cp packaging/android/AndroidManifest.xml "${STAGE}/AndroidManifest.xml"
+          cp LICENSE LICENSE.it NOTICE.md "${STAGE}/"
+          cp -r themes "${STAGE}/themes"
+
+          mkdir -p dist/android/out
+          tar -czf "dist/android/out/libwarp_app_android_arm64-v8a.tar.gz" -C dist/android "warp-im-android-arm64-v8a"
+          sha256sum "dist/android/out/libwarp_app_android_arm64-v8a.tar.gz" > "dist/android/out/libwarp_app_android_arm64-v8a.tar.gz.sha256"
+
+          chmod +x scripts/package-android-apk.sh
+          ./scripts/package-android-apk.sh "${VER}" "target/aarch64-linux-android/release/libwarp_app.so"
+
+      - name: Upload Android Artifacts (.apk + SDK archive)
+        uses: actions/upload-artifact@v4
+        with:
+          name: warp-im-android-packages
+          path: dist/android/out/*
+
+  # ============================================================================
+  # 8. PUBLISH GITHUB RELEASE
+  # ============================================================================
+  publish-release:
+    name: "🚀 Publish GitHub Release (PEFL v1.0)"
+    needs: [package-linux, package-windows, package-macos, package-android]
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download All Built Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release-assets
+          merge-multiple: true
+
+      - name: Generate Consolidated SHA256SUMS.txt
+        run: |
+          cd release-assets
+          sha256sum *.tar.gz *.deb *.AppImage *.zip *.dmg *.apk 2>/dev/null > SHA256SUMS.txt || true
+          cat SHA256SUMS.txt
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          files: |
+            release-assets/*
+          body: |
+            ## 🚀 Warp IM — Universal Native Multi-Protocol Messenger
+            > ⚠️ **Pre-Release (`v0.x`)**: Warp IM is in an advanced stage of active development and is not yet to be considered stable (`v1.0`).
+
+            ### 📦 Direct Downloads
+            - 🪟 **Windows (64-bit)**: `warp-im-0.1.0-windows-x86_64.zip`
+            - 🐧 **Linux (Debian / Ubuntu / Mint)**: `warp-im_0.1.0_amd64.deb`
+            - 🐧 **Linux (Universal AppImage)**: `Warp_IM-0.1.0-x86_64.AppImage`
+            - 🍎 **macOS Universal (Apple Silicon & Intel)**: `Warp-IM-0.1.0-macos-universal.dmg`
+            - 🤖 **Android (`arm64-v8a` Signed APK)**: `warp-im-0.1.0-android-arm64-v8a.apk`
+            - 📱 **iOS (`aarch64` Bundle)**: `libwarp_app_ios_aarch64.tar.gz`
+            - 🛠️ **Linux Sources**: `warp-im-0.1.0-linux-sources.tar.gz`
+
+            **License**: Personal and Educational Free License v1.0 (**PEFL v1.0**) — Copyright (c) 2026 **Rubens Rainelli** (`rubens@rainelli.it`).
+            > **Clause 3 Notice**: At startup, Warp IM displays the PEFL v1.0 license in the foreground and requires explicit user acceptance (persisted for up to 7 days). Free for personal, domestic, educational, and non-profit use; corporate, business, or religious organization use requires prior written authorization and fee.
+

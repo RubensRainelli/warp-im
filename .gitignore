@@ -1,0 +1,13 @@
+/target
+/dist/
+*.db
+*.db-shm
+*.db-wal
+.pefl_accepted_*
+/.private/
+/private/
+/secrets/
+.env
+.env.*
+*.pem
+*.key

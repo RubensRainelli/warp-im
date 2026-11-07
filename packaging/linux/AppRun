@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+# Personal and Educational Free License (PEF License / PEFL)
+# Version 1.0 - 2026-05-26
+# Copyright (c) 2026 Rubens Rainelli (rubens@rainelli.it)
+#
+# AppRun entrypoint for Warp_IM.AppDir / Warp_IM-x86_64.AppImage
+
+set -euo pipefail
+
+HERE="$(dirname "$(readlink -f "${0}")")"
+export WARP_THEMES_DIR="${HERE}/usr/share/warp-im/themes"
+export WARP_LICENSE_DIR="${HERE}/usr/share/doc/warp-im"
+export PATH="${HERE}/usr/bin:${PATH}"
+export LD_LIBRARY_PATH="${HERE}/usr/lib:${LD_LIBRARY_PATH:-}"
+
+exec "${HERE}/usr/bin/warp-im" "$@"

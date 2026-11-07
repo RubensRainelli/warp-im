@@ -1,0 +1,207 @@
+/*
+ * Personal and Educational Free License (PEF License / PEFL)
+ * Version 1.0 - 2026-05-26
+ * Copyright (c) 2026 Rubens Rainelli
+ *
+ * Contact Details:
+ *   Email: rubens@rainelli.it
+ *   GitHub: https://github.com/RubensRainelli/
+ *   Tel: (+39) 342 811 5882
+ *
+ * Personal and educational free use permitted.
+ * Corporate, business or enterprise use prohibited without written authorization and fee.
+ * The full license can be found in the LICENSE file.
+ */
+
+// Strict separation between SuperTheme (layout & UX ergonomics)
+// and ThemePalette (semantic color, opacity, and typography tokens).
+
+export enum NavigationLayout {
+    HorizontalFolders,
+    VerticalServerRail,
+    MinimalistTabs,
+    TelegramUnifiedFolders,
+    DiscordServerRail,
+    WhatsAppMinimalTabs,
+}
+
+export enum MessageLayout {
+    CurvedBubbles,
+    SplitBubbles,
+    FlatFullWidthRows,
+    BubblesSplit,
+    CompactFlatRows,
+}
+
+export enum ReactionStyle {
+    InsideBubbleCorner,
+    BelowMessagePills,
+    FloatingRight,
+}
+
+export struct UiProtocolToggleItem {
+    slug: string,
+    name: string,
+    badge: string,
+    enabled: bool,
+    brand-color: color,
+}
+
+export struct UiFolderTabItem {
+    id: string,
+    name: string,
+    icon: string,
+    unread-count: int,
+}
+
+export struct UiServerRailItem {
+    uri: string,
+    title: string,
+    initials: string,
+    protocol-badge: string,
+    unread-count: int,
+    mention-count: int,
+    is-home: bool,
+}
+
+export struct UiAccountItem {
+    account-id: string,
+    protocol-slug: string,
+    protocol-badge: string,
+    display-name: string,
+    handle-or-uri: string,
+    short-badge: string,
+    enabled: bool,
+    include-in-unified: bool,
+    unread-count: int,
+    brand-color: color,
+}
+
+export struct UiChatListItem {
+    uri: string,
+    account-id: string,
+    account-badge: string,
+    parent-container-uri: string,
+    title: string,
+    subtitle: string,
+    initials: string,
+    protocol-badge: string,
+    protocol-slug: string,
+    last-preview: string,
+    timestamp-text: string,
+    unread-count: int,
+    is-e2ee: bool,
+    is-thread: bool,
+    is-online: bool,
+}
+
+export struct UiMessageItem {
+    uri: string,
+    sender-name: string,
+    sender-initials: string,
+    protocol-badge: string,
+    text: string,
+    timestamp-text: string,
+    delivery-badge: string,
+    is-outgoing: bool,
+    reply-preview: string,
+    reactions-summary: string,
+    can-edit: bool,
+    can-delete-for-all: bool,
+    can-react: bool,
+    can-reply: bool,
+    can-pin: bool,
+}
+
+export struct UiActiveChatCapabilities {
+    can-send-messages: bool,
+    can-edit: bool,
+    can-edit-only-last: bool,
+    can-delete-for-all: bool,
+    can-react: bool,
+    can-reply-quote: bool,
+    can-pin: bool,
+    can-send-voice: bool,
+    can-upload-files: bool,
+    supports-threads: bool,
+    is-e2ee-active: bool,
+    is-read-only: bool,
+}
+
+export struct UiAuthFieldItem {
+    key: string,
+    label: string,
+    placeholder: string,
+    value: string,
+    is-secret: bool,
+}
+
+export global ThemePalette {
+    in-out property <string> palette-id: "dark";
+    in-out property <string> palette-name: "Scuro (Dark Slate)";
+    in-out property <string> font-family: "Inter";
+    in-out property <length> font-size-base: 14px;
+    in-out property <length> font-size-small: 11px;
+
+    in-out property <bool> is-light-mode: false;
+    in-out property <bool> is-oled-mode: false;
+
+    in-out property <color> bg-primary: #0E1621;
+    in-out property <color> bg-secondary: #17212B;
+    in-out property <color> bg-tertiary: #202B36;
+    in-out property <color> bg-elevated: #242F3D;
+    in-out property <color> bubble-outgoing: #2B5278;
+    in-out property <color> bubble-incoming: #182533;
+    in-out property <color> bg-bubble-out: self.bubble-outgoing;
+    in-out property <color> bg-bubble-in: self.bubble-incoming;
+    in-out property <color> text-primary: #F5F5F5;
+    in-out property <color> text-secondary: #8A9AA9;
+    in-out property <color> text-muted: #5E7185;
+    in-out property <color> accent-primary: #5288C1;
+    in-out property <color> accent-secondary: #3E6EA2;
+    in-out property <color> border-subtle: #101924;
+    in-out property <color> status-online: #4ECC5E;
+    in-out property <color> status-warning: #F5A623;
+    in-out property <color> status-danger: #E53935;
+    in-out property <float> surface-opacity: 1.0;
+}
+
+export global SuperTheme {
+    in-out property <string> supertheme-id: "telegram";
+    in-out property <string> supertheme-name: "Telegram Unified Folders";
+
+    in-out property <NavigationLayout> navigation-layout: NavigationLayout.HorizontalFolders;
+    in-out property <NavigationLayout> nav-layout: NavigationLayout.HorizontalFolders;
+    in-out property <MessageLayout> message-layout: MessageLayout.CurvedBubbles;
+    in-out property <ReactionStyle> reaction-style: ReactionStyle.InsideBubbleCorner;
+
+    in-out property <bool> enable-swipe-to-reply: true;
+    in-out property <bool> show-protocol-badge: true;
+    in-out property <bool> compact-timestamps: false;
+
+    // Cross-Platform Responsive Form Factor (Desktop Split-Pane vs Mobile Single-Pane)
+    in-out property <bool> is-mobile-compact: false;
+    in-out property <bool> mobile-showing-chat: false;
+    in-out property <length> safe-area-top: 0px;
+    in-out property <length> safe-area-bottom: 0px;
+
+    in-out property <length> sidebar-width: 320px;
+    in-out property <length> server-rail-width: 68px;
+    in-out property <length> bubble-corner-radius: 14px;
+    in-out property <length> bubble-radius: self.bubble-corner-radius;
+    in-out property <length> avatar-size: 48px;
+
+    in-out property <color> surface-bg: ThemePalette.bg-secondary;
+    in-out property <color> border-color: ThemePalette.border-subtle;
+
+    // Built-In Mobile Touch Keyboard & Android Native IME / Permissions Bridge
+    in-out property <bool> mobile-keyboard-open: false;
+    in-out property <string> mobile-keyboard-target: "";
+    in-out property <string> mobile-keyboard-label: "";
+    in-out property <bool> mobile-keyboard-shift: false;
+    in-out property <bool> mobile-keyboard-symbols: false;
+    callback request-soft-keyboard(string /* target-id */, string /* label */);
+    callback hide-soft-keyboard();
+    callback mobile-key-tap(string /* key */);
+    callback request-android-permissions();
+}

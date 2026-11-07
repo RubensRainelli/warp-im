@@ -1,0 +1,28 @@
+# Personal and Educational Free License (PEF License / PEFL)
+# Version 1.0 - 2026-05-26
+# Copyright (c) 2026 Rubens Rainelli
+
+id = "light"
+name = "☀️ Chiaro (Daylight)"
+font_family = "Inter"
+font_size_base = 14
+font_size_small = 11
+
+bg_primary = "#FFFFFF"
+bg_secondary = "#F0F2F5"
+bg_tertiary = "#E4E6EB"
+bg_elevated = "#FFFFFF"
+bubble_outgoing = "#D9FDD3"
+bubble_incoming = "#F0F2F5"
+text_primary = "#111B21"
+text_secondary = "#54656F"
+text_muted = "#8696A0"
+accent_primary = "#0088CC"
+accent_secondary = "#00A884"
+border_subtle = "#D1D7DB"
+status_online = "#25D366"
+status_warning = "#F59E0B"
+status_danger = "#DC2626"
+surface_opacity = 1.0
+is_light_mode = true
+is_oled_mode = false

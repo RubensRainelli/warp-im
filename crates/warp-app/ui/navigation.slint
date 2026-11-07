@@ -1,0 +1,1202 @@
+/*
+ * Personal and Educational Free License (PEF License / PEFL)
+ * Version 1.0 - 2026-05-26
+ * Copyright (c) 2026 Rubens Rainelli
+ *
+ * Contact Details:
+ *   Email: rubens@rainelli.it
+ *   GitHub: https://github.com/RubensRainelli/
+ *   Tel: (+39) 342 811 5882
+ *
+ * Personal and educational free use permitted.
+ * Corporate, business or enterprise use prohibited without written authorization and fee.
+ * The full license can be found in the LICENSE file.
+ */
+
+import { ScrollView } from "std-widgets.slint";
+import {
+    ThemePalette,
+    SuperTheme,
+    NavigationLayout,
+    UiFolderTabItem,
+    UiServerRailItem,
+    UiChatListItem,
+    UiAccountItem
+} from "globals.slint";
+
+export component PolymorphicNavigation inherits Rectangle {
+    in property <[UiFolderTabItem]> folder-tabs: [];
+    in property <string> active-folder-id: "all";
+
+    in property <[UiServerRailItem]> server-rail: [];
+    in property <string> active-container-uri: "";
+
+    in property <[UiChatListItem]> chats: [];
+    in property <string> active-chat-uri: "";
+
+    in property <[UiAccountItem]> accounts: [];
+    in property <string> active-account-id: "";
+    in property <string> isolation-mode: "unified";
+    in property <string> pinned-chat-uri: "";
+    in property <bool> is-demo-mockup-active: false;
+
+    in-out property <string> search-query: "";
+    in-out property <string> quick-contact-id: "";
+    in-out property <length> custom-chat-list-width: 340px;
+    in-out property <length> custom-channel-tree-width: 240px;
+
+    callback select-folder(string);
+    callback select-container(string);
+    callback select-chat(string);
+    callback select-account(string);
+    callback open-onboarding-for(string);
+    callback open-protocol-picker();
+    callback open-settings-modal();
+    callback open-new-chat-modal();
+    callback search-query-edited(string);
+    callback quick-add-contact(string);
+    callback exit-demo-mockup();
+
+    pure function protocol-avatar-color(slug: string) -> color {
+        if (slug == "telegram") { return #3390EC; }
+        if (slug == "matrix") { return #0DBD8B; }
+        if (slug == "xmpp") { return #F59E0B; }
+        if (slug == "nostr") { return #8B5CF6; }
+        if (slug == "simplex") { return #06B6D4; }
+        if (slug == "irc") { return #10B981; }
+        if (slug == "stoat") { return #EF4444; }
+        if (slug == "mattermost") { return #3B82F6; }
+        return ThemePalette.accent-primary;
+    }
+
+    min-width: SuperTheme.is-mobile-compact
+        ? 260px
+        : (SuperTheme.nav-layout == NavigationLayout.VerticalServerRail
+            ? (SuperTheme.server-rail-width + root.custom-channel-tree-width)
+            : root.custom-chat-list-width);
+    max-width: SuperTheme.is-mobile-compact
+        ? 4096px
+        : self.min-width;
+    horizontal-stretch: SuperTheme.is-mobile-compact ? 1 : 0;
+    background: ThemePalette.bg-secondary;
+    border-width: 1px;
+    border-color: ThemePalette.border-subtle;
+    clip: true;
+
+    HorizontalLayout {
+        spacing: 0px;
+
+        // =====================================================================
+        // 1. Left-most Server/Workspace Rail (Discord / Mattermost / IRC Dense)
+        // =====================================================================
+        if SuperTheme.nav-layout == NavigationLayout.VerticalServerRail : Rectangle {
+            width: SuperTheme.is-mobile-compact ? 52px : SuperTheme.server-rail-width;
+            background: ThemePalette.bg-tertiary;
+            border-width: 1px;
+            border-color: ThemePalette.border-subtle;
+
+            ScrollView {
+                mouse-drag-pan-enabled: true;
+                horizontal-scrollbar-policy: always-off;
+
+                VerticalLayout {
+                    width: parent.visible-width;
+                    padding-top: 8px;
+                    padding-bottom: 8px;
+                    spacing: 8px;
+                    alignment: start;
+
+                    for srv in root.server-rail : Rectangle {
+                        height: SuperTheme.is-mobile-compact ? 42px : 48px;
+                        width: SuperTheme.is-mobile-compact ? 52px : SuperTheme.server-rail-width;
+                        background: transparent;
+
+                        // Active / Unread left indicator pill (4px wide, 32px high when active)
+                        Rectangle {
+                            x: 0px;
+                            width: (root.active-container-uri == srv.uri || srv.unread-count > 0) ? 4px : 0px;
+                            height: root.active-container-uri == srv.uri
+                                ? 28px
+                                : (srv.unread-count > 0 ? 14px : 0px);
+                            y: (parent.height - self.height) / 2;
+                            border-radius: 2px;
+                            background: root.active-container-uri == srv.uri
+                                ? ThemePalette.text-primary
+                                : ThemePalette.accent-primary;
+                        }
+
+                        // Container icon (circle -> squircle when active)
+                        Rectangle {
+                            height: SuperTheme.is-mobile-compact ? 38px : 46px;
+                            width: SuperTheme.is-mobile-compact ? 38px : 46px;
+                            x: (parent.width - self.width) / 2;
+                            y: (parent.height - self.height) / 2;
+                            border-radius: root.active-container-uri == srv.uri ? 12px : 23px;
+                            background: root.active-container-uri == srv.uri
+                                ? ThemePalette.accent-primary
+                                : ThemePalette.bg-elevated;
+                            border-width: srv.unread-count > 0 ? 1px : 0px;
+                            border-color: ThemePalette.status-online;
+
+                            VerticalLayout {
+                                alignment: center;
+                                spacing: 1px;
+                                Text {
+                                    text: srv.initials;
+                                    color: root.active-container-uri == srv.uri
+                                        ? #FFFFFF
+                                        : ThemePalette.text-primary;
+                                    font-size: SuperTheme.is-mobile-compact ? 12px : ThemePalette.font-size-base;
+                                    font-weight: 700;
+                                    horizontal-alignment: center;
+                                }
+                                if SuperTheme.show-protocol-badge && !srv.is-home : Text {
+                                    text: srv.protocol-badge;
+                                    color: root.active-container-uri == srv.uri
+                                        ? #FFFFFF
+                                        : ThemePalette.text-secondary;
+                                    font-size: 8px;
+                                    font-weight: 700;
+                                    horizontal-alignment: center;
+                                }
+                            }
+                        }
+
+                        TouchArea {
+                            mouse-cursor: pointer;
+                            clicked => {
+                                root.select-container(srv.uri);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // =====================================================================
+        // 2. Main Channel / Unified Chat List Column (Telegram Desktop & Mobile Style)
+        // =====================================================================
+        Rectangle {
+            horizontal-stretch: 1;
+            clip: true;
+            background: SuperTheme.nav-layout == NavigationLayout.MinimalistTabs
+                ? ThemePalette.bg-primary
+                : ThemePalette.bg-secondary;
+
+            VerticalLayout {
+                spacing: 0px;
+
+                // -------------------------------------------------------------
+                // TOP SIDEBAR HEADER (56px): `☰` Menu + Custom Dark Search Bar + `+ Account` + `+` New Chat
+                // -------------------------------------------------------------
+                Rectangle {
+                    height: 56px;
+                    background: ThemePalette.bg-secondary;
+                    border-width: 1px;
+                    border-color: ThemePalette.border-subtle;
+
+                    HorizontalLayout {
+                        padding-left: 8px;
+                        padding-right: 8px;
+                        padding-top: 9px;
+                        padding-bottom: 9px;
+                        spacing: 6px;
+
+                        // `☰` Hamburger Menu / Settings Button (38px x 38px)
+                        Rectangle {
+                            width: 38px;
+                            height: 38px;
+                            border-radius: 19px;
+                            background: menu-touch.has-hover
+                                ? ThemePalette.bg-elevated
+                                : ThemePalette.bg-tertiary;
+                            border-width: 1px;
+                            border-color: ThemePalette.border-subtle;
+
+                            Text {
+                                text: "☰";
+                                color: ThemePalette.text-primary;
+                                font-size: 17px;
+                                font-weight: 700;
+                                horizontal-alignment: center;
+                                vertical-alignment: center;
+                            }
+
+                            menu-touch := TouchArea {
+                                mouse-cursor: pointer;
+                                clicked => {
+                                    root.open-settings-modal();
+                                }
+                            }
+                        }
+
+                        // Custom Dark Rounded Search Bar (`Cerca chat o messaggi...`)
+                        Rectangle {
+                            horizontal-stretch: 1;
+                            height: 38px;
+                            border-radius: 19px;
+                            background: ThemePalette.bg-tertiary;
+                            border-width: 1px;
+                            border-color: search-input.has-focus
+                                ? ThemePalette.accent-primary
+                                : ThemePalette.border-subtle;
+
+                            HorizontalLayout {
+                                padding-left: 12px;
+                                padding-right: 6px;
+                                spacing: 4px;
+
+                                Rectangle {
+                                    horizontal-stretch: 1;
+                                    clip: true;
+
+                                    if root.search-query == "" : Text {
+                                        width: parent.width;
+                                        height: parent.height;
+                                        text: "Cerca chat o messaggi...";
+                                        color: ThemePalette.text-muted;
+                                        font-size: 12px;
+                                        vertical-alignment: center;
+                                        overflow: elide;
+                                    }
+
+                                    search-input := TextInput {
+                                        width: parent.width;
+                                        height: parent.height;
+                                        text <=> root.search-query;
+                                        color: ThemePalette.text-primary;
+                                        font-size: 12px;
+                                        single-line: true;
+                                        vertical-alignment: center;
+                                        edited => {
+                                            root.search-query-edited(root.search-query);
+                                        }
+                                    }
+
+                                    search-touch := TouchArea {
+                                        mouse-cursor: text;
+                                        clicked => {
+                                            search-input.focus();
+                                            SuperTheme.request-soft-keyboard("search", "Cerca chat o messaggi");
+                                        }
+                                    }
+                                }
+
+                                if root.search-query != "" : Rectangle {
+                                    width: 22px;
+                                    height: 22px;
+                                    y: (parent.height - self.height) / 2;
+                                    border-radius: 11px;
+                                    background: ThemePalette.bg-elevated;
+
+                                    Text {
+                                        text: "×";
+                                        color: ThemePalette.text-secondary;
+                                        font-size: 12px;
+                                        font-weight: 700;
+                                        horizontal-alignment: center;
+                                        vertical-alignment: center;
+                                    }
+
+                                    TouchArea {
+                                        mouse-cursor: pointer;
+                                        clicked => {
+                                            root.search-query = "";
+                                            root.search-query-edited("");
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        // `+ Account` Button (Step 1 of 3-Step Account Selection!)
+                        Rectangle {
+                            width: SuperTheme.is-mobile-compact ? 46px : 98px;
+                            height: 38px;
+                            border-radius: 19px;
+                            background: add-acct-hdr-touch.has-hover
+                                ? ThemePalette.bg-elevated
+                                : ThemePalette.bg-tertiary;
+                            border-width: 1px;
+                            border-color: ThemePalette.accent-primary;
+
+                            Text {
+                                text: SuperTheme.is-mobile-compact ? "+Acc" : "+ Account";
+                                color: ThemePalette.accent-primary;
+                                font-size: 11px;
+                                font-weight: 700;
+                                horizontal-alignment: center;
+                                vertical-alignment: center;
+                            }
+
+                            add-acct-hdr-touch := TouchArea {
+                                mouse-cursor: pointer;
+                                clicked => {
+                                    root.open-protocol-picker();
+                                }
+                            }
+                        }
+
+                        // `+` New Chat / Channel Button (38px x 38px)
+                        Rectangle {
+                            width: 38px;
+                            height: 38px;
+                            border-radius: 19px;
+                            background: new-chat-touch.has-hover
+                                ? ThemePalette.accent-secondary
+                                : ThemePalette.accent-primary;
+
+                            Text {
+                                text: "+";
+                                color: #FFFFFF;
+                                font-size: 16px;
+                                font-weight: 700;
+                                horizontal-alignment: center;
+                                vertical-alignment: center;
+                            }
+
+                            new-chat-touch := TouchArea {
+                                mouse-cursor: pointer;
+                                clicked => {
+                                    root.open-new-chat-modal();
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // -------------------------------------------------------------
+                // Quick Add Contact Bar (`contact-input` + `+ID` 11px bold button)
+                // -------------------------------------------------------------
+                Rectangle {
+                    height: 36px;
+                    background: ThemePalette.bg-secondary;
+                    border-width: 1px;
+                    border-color: ThemePalette.border-subtle;
+
+                    HorizontalLayout {
+                        padding-left: 8px;
+                        padding-right: 8px;
+                        padding-top: 4px;
+                        padding-bottom: 4px;
+                        spacing: 6px;
+
+                        Rectangle {
+                            horizontal-stretch: 1;
+                            height: 28px;
+                            border-radius: 14px;
+                            background: ThemePalette.bg-tertiary;
+                            border-width: 1px;
+                            border-color: contact-input.has-focus
+                                ? ThemePalette.accent-primary
+                                : ThemePalette.border-subtle;
+
+                            HorizontalLayout {
+                                padding-left: 10px;
+                                padding-right: 8px;
+
+                                Rectangle {
+                                    horizontal-stretch: 1;
+                                    clip: true;
+
+                                    if root.quick-contact-id == "" : Text {
+                                        width: parent.width;
+                                        height: parent.height;
+                                        text: "ID Contatto / @username / +telefono...";
+                                        color: ThemePalette.text-muted;
+                                        font-size: 11px;
+                                        vertical-alignment: center;
+                                        overflow: elide;
+                                    }
+
+                                    contact-input := TextInput {
+                                        width: parent.width;
+                                        height: parent.height;
+                                        text <=> root.quick-contact-id;
+                                        color: ThemePalette.text-primary;
+                                        font-size: 11px;
+                                        single-line: true;
+                                        vertical-alignment: center;
+                                        accepted => {
+                                            if (root.quick-contact-id != "") {
+                                                root.quick-add-contact(root.quick-contact-id);
+                                                root.quick-contact-id = "";
+                                            }
+                                        }
+                                    }
+
+                                    contact-touch := TouchArea {
+                                        mouse-cursor: text;
+                                        clicked => {
+                                            contact-input.focus();
+                                            SuperTheme.request-soft-keyboard("quick_contact", "ID Contatto / @username / +telefono");
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        // Quick Add Contact Button `+ID` (11px bold)
+                        Rectangle {
+                            width: 44px;
+                            height: 28px;
+                            border-radius: 14px;
+                            background: quick-id-touch.has-hover
+                                ? ThemePalette.accent-secondary
+                                : ThemePalette.accent-primary;
+
+                            Text {
+                                text: "+ID";
+                                color: #FFFFFF;
+                                font-size: 11px;
+                                font-weight: 700;
+                                horizontal-alignment: center;
+                                vertical-alignment: center;
+                            }
+
+                            quick-id-touch := TouchArea {
+                                mouse-cursor: pointer;
+                                clicked => {
+                                    if (root.quick-contact-id != "") {
+                                        root.quick-add-contact(root.quick-contact-id);
+                                        root.quick-contact-id = "";
+                                    } else {
+                                        contact-input.focus();
+                                        SuperTheme.request-soft-keyboard("quick_contact", "ID Contatto / @username / +telefono");
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // -------------------------------------------------------------
+                // Horizontal Scrollable Account / Protocol Quick-Filter Bar
+                // + Prominent `+ Aggiungi Account` Action Pill
+                // -------------------------------------------------------------
+                Rectangle {
+                    height: 34px;
+                    background: ThemePalette.bg-tertiary;
+                    border-width: 1px;
+                    border-color: ThemePalette.border-subtle;
+
+                    HorizontalLayout {
+                        padding-left: 4px;
+                        padding-right: 4px;
+                        spacing: 2px;
+
+                        // Left scroll chevron `‹`
+                        Rectangle {
+                            width: 20px;
+                            height: 26px;
+                            y: 4px;
+                            border-radius: 6px;
+                            background: acct-left-touch.has-hover ? ThemePalette.bg-elevated : transparent;
+                            Text {
+                                text: "‹";
+                                color: ThemePalette.text-secondary;
+                                font-size: 14px;
+                                font-weight: 700;
+                                horizontal-alignment: center;
+                                vertical-alignment: center;
+                            }
+                            acct-left-touch := TouchArea {
+                                mouse-cursor: pointer;
+                                clicked => {
+                                    acct-flick.viewport-x = Math.min(0px, acct-flick.viewport-x + 120px);
+                                }
+                            }
+                        }
+
+                        acct-flick := Flickable {
+                            horizontal-stretch: 1;
+                            height: 32px;
+                            interactive: true;
+                            mouse-drag-pan-enabled: true;
+                            viewport-height: 32px;
+                            viewport-width: Math.max(self.width, (root.accounts.length + 1) * 96px + 40px);
+
+                            HorizontalLayout {
+                                padding-top: 4px;
+                                padding-bottom: 4px;
+                                spacing: 6px;
+                                alignment: start;
+
+                                // Prominent `+ Aggiungi Account` pill (Always 1 tap away!)
+                                Rectangle {
+                                    width: 126px;
+                                    height: 24px;
+                                    border-radius: 12px;
+                                    background: add-acct-pill-touch.has-hover
+                                        ? ThemePalette.accent-secondary
+                                        : ThemePalette.accent-primary;
+
+                                    Text {
+                                        text: "+ Aggiungi Account";
+                                        color: #FFFFFF;
+                                        font-size: 10px;
+                                        font-weight: 700;
+                                        horizontal-alignment: center;
+                                        vertical-alignment: center;
+                                    }
+
+                                    add-acct-pill-touch := TouchArea {
+                                        mouse-cursor: pointer;
+                                        clicked => {
+                                            root.open-protocol-picker();
+                                        }
+                                    }
+                                }
+
+                                for acct in root.accounts : Rectangle {
+                                    width: 84px;
+                                    height: 24px;
+                                    border-radius: 12px;
+                                    background: root.active-account-id == acct.account-id
+                                        ? ThemePalette.accent-primary
+                                        : ThemePalette.bg-elevated;
+                                    border-width: 1px;
+                                    border-color: acct.brand-color;
+
+                                    HorizontalLayout {
+                                        padding-left: 6px;
+                                        padding-right: 6px;
+                                        spacing: 3px;
+                                        alignment: center;
+
+                                        Text {
+                                            text: acct.short-badge;
+                                            color: root.active-account-id == acct.account-id
+                                                ? #FFFFFF
+                                                : ThemePalette.text-primary;
+                                            font-size: 10px;
+                                            font-weight: 700;
+                                            vertical-alignment: center;
+                                            overflow: elide;
+                                        }
+
+                                        if acct.unread-count > 0 : Text {
+                                            text: "" + acct.unread-count;
+                                            color: root.active-account-id == acct.account-id
+                                                ? #FFFFFF
+                                                : ThemePalette.status-online;
+                                            font-size: 9px;
+                                            font-weight: 700;
+                                            vertical-alignment: center;
+                                        }
+                                    }
+
+                                    TouchArea {
+                                        mouse-cursor: pointer;
+                                        clicked => {
+                                            root.select-account(acct.account-id);
+                                        }
+                                        scroll-event(event) => {
+                                            acct-flick.viewport-x = Math.clamp(
+                                                acct-flick.viewport-x + (event.delta-x != 0px ? event.delta-x : event.delta-y),
+                                                Math.min(0px, acct-flick.width - acct-flick.viewport-width),
+                                                0px
+                                            );
+                                            return accept;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        // Right scroll chevron `›`
+                        Rectangle {
+                            width: 20px;
+                            height: 26px;
+                            y: 4px;
+                            border-radius: 6px;
+                            background: acct-right-touch.has-hover ? ThemePalette.bg-elevated : transparent;
+                            Text {
+                                text: "›";
+                                color: ThemePalette.text-secondary;
+                                font-size: 14px;
+                                font-weight: 700;
+                                horizontal-alignment: center;
+                                vertical-alignment: center;
+                            }
+                            acct-right-touch := TouchArea {
+                                mouse-cursor: pointer;
+                                clicked => {
+                                    acct-flick.viewport-x = Math.max(
+                                        Math.min(0px, acct-flick.width - acct-flick.viewport-width),
+                                        acct-flick.viewport-x - 120px
+                                    );
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // -------------------------------------------------------------
+                // A. Telegram / WhatsApp Horizontal Scrollable Folder / Category Tabs
+                //    (Flickable + Left/Right `‹`/`›` Buttons + Mouse Drag & Wheel Scroll)
+                // -------------------------------------------------------------
+                if SuperTheme.nav-layout != NavigationLayout.VerticalServerRail : Rectangle {
+                    height: 44px;
+                    background: ThemePalette.bg-secondary;
+                    border-width: 1px;
+                    border-color: ThemePalette.border-subtle;
+
+                    HorizontalLayout {
+                        padding-left: 2px;
+                        padding-right: 2px;
+                        spacing: 2px;
+
+                        // Left Horizontal Scroll Button `‹`
+                        Rectangle {
+                            width: 22px;
+                            height: 36px;
+                            y: 4px;
+                            border-radius: 6px;
+                            background: folder-left-touch.has-hover ? ThemePalette.bg-elevated : transparent;
+
+                            Text {
+                                text: "‹";
+                                color: ThemePalette.text-secondary;
+                                font-size: 16px;
+                                font-weight: 700;
+                                horizontal-alignment: center;
+                                vertical-alignment: center;
+                            }
+
+                            folder-left-touch := TouchArea {
+                                mouse-cursor: pointer;
+                                clicked => {
+                                    folder-flick.viewport-x = Math.min(0px, folder-flick.viewport-x + 120px);
+                                }
+                            }
+                        }
+
+                        // Horizontally Scrollable Folder Tabs Flickable
+                        folder-flick := Flickable {
+                            horizontal-stretch: 1;
+                            height: 42px;
+                            interactive: true;
+                            mouse-drag-pan-enabled: true;
+                            viewport-height: 42px;
+                            viewport-width: Math.max(self.width, root.folder-tabs.length * 108px);
+
+                            HorizontalLayout {
+                                spacing: 4px;
+                                alignment: start;
+
+                                for folder in root.folder-tabs : Rectangle {
+                                    width: 104px;
+                                    height: 42px;
+                                    border-radius: SuperTheme.nav-layout == NavigationLayout.MinimalistTabs ? 16px : 0px;
+                                    background: SuperTheme.nav-layout == NavigationLayout.MinimalistTabs
+                                        ? (root.active-folder-id == folder.id ? ThemePalette.accent-secondary : ThemePalette.bg-tertiary)
+                                        : (folder-tab-touch.has-hover ? ThemePalette.bg-tertiary : transparent);
+
+                                    HorizontalLayout {
+                                        padding-left: 8px;
+                                        padding-right: 8px;
+                                        spacing: 4px;
+                                        alignment: center;
+
+                                        Text {
+                                            text: folder.icon != "" ? (folder.icon + " " + folder.name) : folder.name;
+                                            color: root.active-folder-id == folder.id
+                                                ? (SuperTheme.nav-layout == NavigationLayout.MinimalistTabs ? #FFFFFF : ThemePalette.accent-primary)
+                                                : ThemePalette.text-secondary;
+                                            font-size: 12px;
+                                            font-weight: root.active-folder-id == folder.id ? 700 : 600;
+                                            vertical-alignment: center;
+                                            overflow: elide;
+                                        }
+
+                                        if folder.unread-count > 0 : Rectangle {
+                                            min-width: 18px;
+                                            height: 16px;
+                                            y: (parent.height - self.height) / 2;
+                                            border-radius: 8px;
+                                            background: root.active-folder-id == folder.id
+                                                ? ThemePalette.accent-primary
+                                                : ThemePalette.bg-elevated;
+
+                                            HorizontalLayout {
+                                                padding-left: 4px;
+                                                padding-right: 4px;
+                                                Text {
+                                                    text: "" + folder.unread-count;
+                                                    color: root.active-folder-id == folder.id
+                                                        ? #FFFFFF
+                                                        : ThemePalette.text-secondary;
+                                                    font-size: 9px;
+                                                    font-weight: 700;
+                                                    horizontal-alignment: center;
+                                                    vertical-alignment: center;
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    // Active bottom indicator bar (Telegram style)
+                                    if SuperTheme.nav-layout != NavigationLayout.MinimalistTabs && root.active-folder-id == folder.id : Rectangle {
+                                        y: parent.height - 3px;
+                                        height: 3px;
+                                        width: parent.width - 16px;
+                                        x: 8px;
+                                        border-radius: 1.5px;
+                                        background: ThemePalette.accent-primary;
+                                    }
+
+                                    folder-tab-touch := TouchArea {
+                                        mouse-cursor: pointer;
+                                        clicked => {
+                                            root.select-folder(folder.id);
+                                        }
+                                        scroll-event(event) => {
+                                            folder-flick.viewport-x = Math.clamp(
+                                                folder-flick.viewport-x + (event.delta-x != 0px ? event.delta-x : event.delta-y),
+                                                Math.min(0px, folder-flick.width - folder-flick.viewport-width),
+                                                0px
+                                            );
+                                            return accept;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        // Right Horizontal Scroll Button `›`
+                        Rectangle {
+                            width: 22px;
+                            height: 36px;
+                            y: 4px;
+                            border-radius: 6px;
+                            background: folder-right-touch.has-hover ? ThemePalette.bg-elevated : transparent;
+
+                            Text {
+                                text: "›";
+                                color: ThemePalette.text-secondary;
+                                font-size: 16px;
+                                font-weight: 700;
+                                horizontal-alignment: center;
+                                vertical-alignment: center;
+                            }
+
+                            folder-right-touch := TouchArea {
+                                mouse-cursor: pointer;
+                                clicked => {
+                                    folder-flick.viewport-x = Math.max(
+                                        Math.min(0px, folder-flick.width - folder-flick.viewport-width),
+                                        folder-flick.viewport-x - 120px
+                                    );
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // -------------------------------------------------------------
+                // C. Discord Categorized Channel Tree Header (`VerticalServerRail`)
+                // -------------------------------------------------------------
+                if SuperTheme.nav-layout == NavigationLayout.VerticalServerRail : Rectangle {
+                    height: 34px;
+                    background: ThemePalette.bg-secondary;
+                    border-width: 1px;
+                    border-color: ThemePalette.border-subtle;
+
+                    HorizontalLayout {
+                        padding-left: 12px;
+                        padding-right: 12px;
+                        Text {
+                            text: "▼ WORKSPACE & CANALI ATTIVI";
+                            color: ThemePalette.text-muted;
+                            font-size: 10px;
+                            font-weight: 700;
+                            vertical-alignment: center;
+                        }
+                    }
+                }
+
+                // -------------------------------------------------------------
+                // Scrollable Chat / Channel List (Telegram Desktop & Mobile 68px Rows)
+                // -------------------------------------------------------------
+                ScrollView {
+                    vertical-stretch: 1;
+                    mouse-drag-pan-enabled: true;
+                    horizontal-scrollbar-policy: always-off;
+
+                    VerticalLayout {
+                        width: parent.visible-width;
+                        padding: 6px;
+                        spacing: SuperTheme.nav-layout == NavigationLayout.VerticalServerRail ? 2px : 3px;
+                        alignment: start;
+
+                        if root.chats.length == 0 : Rectangle {
+                            height: 168px;
+                            border-radius: 14px;
+                            background: ThemePalette.bg-tertiary;
+                            border-width: 1px;
+                            border-color: ThemePalette.border-subtle;
+
+                            VerticalLayout {
+                                padding: 18px;
+                                spacing: 8px;
+                                alignment: center;
+
+                                Rectangle {
+                                    width: 44px;
+                                    height: 44px;
+                                    x: (parent.width - self.width) / 2;
+                                    border-radius: 22px;
+                                    background: ThemePalette.accent-primary;
+
+                                    Text {
+                                        text: "W";
+                                        color: #FFFFFF;
+                                        font-size: 20px;
+                                        font-weight: 800;
+                                        horizontal-alignment: center;
+                                        vertical-alignment: center;
+                                    }
+                                }
+
+                                Text {
+                                    text: "Nessuna conversazione";
+                                    color: ThemePalette.text-primary;
+                                    font-size: 14px;
+                                    font-weight: 700;
+                                    horizontal-alignment: center;
+                                }
+
+                                Text {
+                                    text: "Tocca + per iniziare una nuova chat o cambia filtro sopra.";
+                                    color: ThemePalette.text-secondary;
+                                    font-size: 12px;
+                                    wrap: word-wrap;
+                                    horizontal-alignment: center;
+                                }
+                            }
+                        }
+
+                        for chat in root.chats : Rectangle {
+                            height: SuperTheme.nav-layout == NavigationLayout.VerticalServerRail ? 38px : 68px;
+                            border-radius: SuperTheme.nav-layout == NavigationLayout.VerticalServerRail ? 6px : 12px;
+                            background: root.active-chat-uri == chat.uri
+                                ? ThemePalette.bg-elevated
+                                : (chat-row-touch.has-hover ? ThemePalette.bg-tertiary : transparent);
+                            border-width: root.active-chat-uri == chat.uri ? 1px : 0px;
+                            border-color: SuperTheme.nav-layout == NavigationLayout.MinimalistTabs
+                                ? ThemePalette.accent-secondary
+                                : ThemePalette.accent-primary;
+
+                            // Left active indicator pill (Telegram Desktop style)
+                            if root.active-chat-uri == chat.uri && SuperTheme.nav-layout != NavigationLayout.VerticalServerRail : Rectangle {
+                                x: 0px;
+                                y: 12px;
+                                width: 4px;
+                                height: parent.height - 24px;
+                                border-radius: 2px;
+                                background: ThemePalette.accent-primary;
+                            }
+
+                            // 1) DISCORD / IRC CHANNEL TREE ROW (`#` or `›` prefix)
+                            if SuperTheme.nav-layout == NavigationLayout.VerticalServerRail : HorizontalLayout {
+                                padding-left: chat.is-thread ? 24px : 10px;
+                                padding-right: 10px;
+                                spacing: 8px;
+                                alignment: start;
+
+                                Text {
+                                    text: chat.is-thread ? "›" : "#";
+                                    color: root.active-chat-uri == chat.uri
+                                        ? ThemePalette.accent-primary
+                                        : ThemePalette.text-muted;
+                                    font-size: 14px;
+                                    font-weight: 700;
+                                    vertical-alignment: center;
+                                }
+
+                                Text {
+                                    text: chat.title;
+                                    color: (root.active-chat-uri == chat.uri || chat.unread-count > 0)
+                                        ? ThemePalette.text-primary
+                                        : ThemePalette.text-secondary;
+                                    font-size: ThemePalette.font-size-base;
+                                    font-weight: (root.active-chat-uri == chat.uri || chat.unread-count > 0) ? 700 : 500;
+                                    overflow: elide;
+                                    horizontal-stretch: 1;
+                                    vertical-alignment: center;
+                                }
+
+                                if SuperTheme.show-protocol-badge : Rectangle {
+                                    width: 48px;
+                                    height: 16px;
+                                    y: (parent.height - self.height) / 2;
+                                    border-radius: 4px;
+                                    background: ThemePalette.bg-tertiary;
+                                    Text {
+                                        text: chat.account-badge != "" ? chat.account-badge : chat.protocol-badge;
+                                        color: root.protocol-avatar-color(chat.protocol-slug);
+                                        font-size: 9px;
+                                        font-weight: 700;
+                                        horizontal-alignment: center;
+                                        vertical-alignment: center;
+                                    }
+                                }
+
+                                if chat.unread-count > 0 : Rectangle {
+                                    min-width: 20px;
+                                    height: 16px;
+                                    y: (parent.height - self.height) / 2;
+                                    border-radius: 8px;
+                                    background: ThemePalette.status-danger;
+                                    Text {
+                                        text: "" + chat.unread-count;
+                                        color: #FFFFFF;
+                                        font-size: 9px;
+                                        font-weight: 700;
+                                        horizontal-alignment: center;
+                                        vertical-alignment: center;
+                                    }
+                                }
+                            }
+
+                            // 2) TELEGRAM / WHATSAPP 68px RICH AVATAR CHAT ROW
+                            if SuperTheme.nav-layout != NavigationLayout.VerticalServerRail : HorizontalLayout {
+                                padding-left: chat.is-thread ? 20px : 10px;
+                                padding-right: 10px;
+                                padding-top: 8px;
+                                padding-bottom: 8px;
+                                spacing: 12px;
+                                alignment: start;
+
+                                // Circular Avatar (48px x 48px, border-radius: 24px) with deterministic protocol color
+                                Rectangle {
+                                    width: 48px;
+                                    height: 48px;
+                                    y: (parent.height - self.height) / 2;
+                                    border-radius: 24px;
+                                    background: root.protocol-avatar-color(chat.protocol-slug);
+
+                                    Text {
+                                        text: chat.initials;
+                                        color: #FFFFFF;
+                                        font-size: 15px;
+                                        font-weight: 700;
+                                        horizontal-alignment: center;
+                                        vertical-alignment: center;
+                                    }
+
+                                    // Online dot indicator at top-right of avatar
+                                    if chat.is-online : Rectangle {
+                                        width: 12px;
+                                        height: 12px;
+                                        x: parent.width - 12px;
+                                        y: 0px;
+                                        border-radius: 6px;
+                                        background: ThemePalette.status-online;
+                                        border-width: 2px;
+                                        border-color: ThemePalette.bg-secondary;
+                                    }
+
+                                    // Bottom-right Protocol Badge Pill (16px height)
+                                    if SuperTheme.show-protocol-badge : Rectangle {
+                                        width: 26px;
+                                        height: 16px;
+                                        x: parent.width - 24px;
+                                        y: parent.height - 15px;
+                                        border-radius: 8px;
+                                        background: ThemePalette.bg-tertiary;
+                                        border-width: 1.5px;
+                                        border-color: ThemePalette.bg-secondary;
+
+                                        Text {
+                                            text: chat.protocol-badge;
+                                            color: root.protocol-avatar-color(chat.protocol-slug);
+                                            font-size: 8px;
+                                            font-weight: 700;
+                                            horizontal-alignment: center;
+                                            vertical-alignment: center;
+                                        }
+                                    }
+                                }
+
+                                // Right Column: Top Row (Title + Pin + Timestamp) & Bottom Row (Account + Preview + Unread Pill)
+                                VerticalLayout {
+                                    horizontal-stretch: 1;
+                                    alignment: center;
+                                    spacing: 4px;
+
+                                    // Top Row: E2EE / Thread icon + Bold Title (14px) + Pin indicator + Timestamp (11px)
+                                    HorizontalLayout {
+                                        spacing: 5px;
+
+                                        if chat.is-e2ee : Text {
+                                            text: "[E2E]";
+                                            color: ThemePalette.status-online;
+                                            font-size: 9px;
+                                            font-weight: 700;
+                                            vertical-alignment: center;
+                                        }
+
+                                        if chat.is-thread : Text {
+                                            text: "›";
+                                            color: ThemePalette.accent-primary;
+                                            font-size: 13px;
+                                            font-weight: 700;
+                                            vertical-alignment: center;
+                                        }
+
+                                        Text {
+                                            text: chat.title;
+                                            color: ThemePalette.text-primary;
+                                            font-size: 14px;
+                                            font-weight: 700;
+                                            overflow: elide;
+                                            horizontal-stretch: 1;
+                                            vertical-alignment: center;
+                                        }
+
+                                        if root.pinned-chat-uri != "" && root.pinned-chat-uri == chat.uri : Text {
+                                            text: "★";
+                                            color: ThemePalette.accent-primary;
+                                            font-size: 12px;
+                                            font-weight: 700;
+                                            vertical-alignment: center;
+                                        }
+
+                                        Text {
+                                            text: chat.timestamp-text;
+                                            color: chat.unread-count > 0
+                                                ? (SuperTheme.nav-layout == NavigationLayout.MinimalistTabs
+                                                    ? ThemePalette.status-online
+                                                    : ThemePalette.accent-primary)
+                                                : ThemePalette.text-muted;
+                                            font-size: 11px;
+                                            font-weight: chat.unread-count > 0 ? 700 : 400;
+                                            vertical-alignment: center;
+                                        }
+                                    }
+
+                                    // Bottom Row: Account sub-label + Last message preview (13px, muted) + Unread Counter Pill (20px)
+                                    HorizontalLayout {
+                                        spacing: 6px;
+
+                                        if chat.account-badge != "" : Rectangle {
+                                            height: 16px;
+                                            y: (parent.height - self.height) / 2;
+                                            border-radius: 4px;
+                                            background: ThemePalette.bg-tertiary;
+
+                                            HorizontalLayout {
+                                                padding-left: 5px;
+                                                padding-right: 5px;
+                                                Text {
+                                                    text: chat.account-badge;
+                                                    color: root.protocol-avatar-color(chat.protocol-slug);
+                                                    font-size: 9px;
+                                                    font-weight: 700;
+                                                    vertical-alignment: center;
+                                                }
+                                            }
+                                        }
+
+                                        Text {
+                                            text: chat.last-preview != "" ? chat.last-preview : chat.subtitle;
+                                            color: ThemePalette.text-secondary;
+                                            font-size: 13px;
+                                            overflow: elide;
+                                            horizontal-stretch: 1;
+                                            vertical-alignment: center;
+                                        }
+
+                                        if chat.unread-count > 0 : Rectangle {
+                                            min-width: 22px;
+                                            height: 20px;
+                                            border-radius: 10px;
+                                            background: SuperTheme.nav-layout == NavigationLayout.MinimalistTabs
+                                                ? ThemePalette.status-online
+                                                : ThemePalette.accent-primary;
+
+                                            HorizontalLayout {
+                                                padding-left: 6px;
+                                                padding-right: 6px;
+                                                Text {
+                                                    text: "" + chat.unread-count;
+                                                    color: #FFFFFF;
+                                                    font-size: 11px;
+                                                    font-weight: 700;
+                                                    horizontal-alignment: center;
+                                                    vertical-alignment: center;
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+
+                            chat-row-touch := TouchArea {
+                                mouse-cursor: pointer;
+                                clicked => {
+                                    root.select-chat(chat.uri);
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // -------------------------------------------------------------
+                // Subtle Demo Mode Footer Pill (`is-demo-mockup-active`)
+                // -------------------------------------------------------------
+                if root.is-demo-mockup-active : Rectangle {
+                    height: 36px;
+                    background: ThemePalette.bg-tertiary;
+                    border-width: 1px;
+                    border-color: ThemePalette.border-subtle;
+
+                    HorizontalLayout {
+                        padding-left: 10px;
+                        padding-right: 10px;
+                        spacing: 6px;
+
+                        Text {
+                            text: "[DEMO] Modalità Demo Attiva";
+                            color: ThemePalette.status-warning;
+                            font-size: 11px;
+                            font-weight: 700;
+                            vertical-alignment: center;
+                            horizontal-stretch: 1;
+                        }
+
+                        Rectangle {
+                            width: 118px;
+                            height: 24px;
+                            y: 6px;
+                            border-radius: 6px;
+                            background: exit-demo-touch.has-hover
+                                ? ThemePalette.status-danger
+                                : ThemePalette.bg-elevated;
+                            border-width: 1px;
+                            border-color: ThemePalette.status-warning;
+
+                            Text {
+                                text: "Esci dal Mockup";
+                                color: exit-demo-touch.has-hover ? #FFFFFF : ThemePalette.status-warning;
+                                font-size: 10px;
+                                font-weight: 700;
+                                horizontal-alignment: center;
+                                vertical-alignment: center;
+                            }
+
+                            exit-demo-touch := TouchArea {
+                                mouse-cursor: pointer;
+                                clicked => {
+                                    root.exit-demo-mockup();
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

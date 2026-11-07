@@ -1,0 +1,119 @@
+# Personal and Educational Free License (PEF License / PEFL)
+# Version 1.0 - 2026-05-26
+# Copyright (c) 2026 Rubens Rainelli
+#
+# Contact Details:
+#   Email: rubens@rainelli.it
+#   GitHub: https://github.com/RubensRainelli/
+#   Tel: (+39) 342 811 5882
+#
+# Personal and educational free use permitted.
+# Corporate, business or enterprise use prohibited without written authorization and fee.
+# The full license can be found in the LICENSE file.
+
+name: Warp IM — Multi-Platform CI & PEFL v1.0 Compliance
+
+on:
+  push:
+    branches: [ main, master, develop ]
+  pull_request:
+    branches: [ main, master, develop ]
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  pefl-license-audit:
+    name: "⚖️ PEFL v1.0 License & Header Audit"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Verify Mandatory PEFL v1.0 Files Exist
+        run: |
+          set -euo pipefail
+          for f in LICENSE LICENSE.it NOTICE.md AI_INSTRUCTIONS.md AGENTS.md README.md README.it.md; do
+            if [ ! -f "$f" ]; then
+              echo "::error::Missing mandatory PEFL v1.0 / Documentation file: $f"
+              exit 1
+            fi
+          done
+          grep -q "Personal and Educational Free License" LICENSE
+          grep -q "Rubens Rainelli" LICENSE
+          grep -q "Rubens Rainelli" LICENSE.it
+          grep -q "Rubens Rainelli" NOTICE.md
+          echo "✅ Mandatory PEFL v1.0 files verified."
+
+      - name: Verify PEFL v1.0 Headers in Rust & Slint Sources
+        run: |
+          set -euo pipefail
+          missing=0
+          for src in $(find crates -type f \( -name "*.rs" -o -name "*.slint" \)); do
+            if ! head -n 20 "$src" | grep -q "Rubens Rainelli"; then
+              echo "::error file=$src::Missing PEFL v1.0 copyright header (Rubens Rainelli) in $src"
+              missing=1
+            fi
+          done
+          if [ "$missing" -ne 0 ]; then
+            exit 1
+          fi
+          echo "✅ All Rust and Slint source files carry the official PEFL v1.0 header."
+
+  ci-matrix:
+    name: "🧪 Test & Headless Check (${{ matrix.os }})"
+    needs: pefl-license-audit
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            platform_name: Linux (x86_64)
+          - os: windows-latest
+            platform_name: Windows (x86_64 MSVC)
+          - os: macos-latest
+            platform_name: macOS (Apple Silicon / Universal)
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Install Linux System Dependencies (X11 / Wayland / Fontconfig / pkg-config)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            pkg-config \
+            libfontconfig1-dev \
+            libfreetype6-dev \
+            libxkbcommon-dev \
+            libxkbcommon-x11-0 \
+            libxcb-shape0-dev \
+            libxcb-xfixes0-dev \
+            libgl1-mesa-dev
+
+      - name: Install Rust Stable Toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust Cache
+        uses: Swatinem/rust-cache@v2
+
+      - name: Cargo Check Workspace
+        run: cargo check --workspace --all-targets
+
+      - name: Run Full Unit & Integration Test Suite (PEFL Clause 3 + 8 Protocols + Outbox + Multi-Account Isolation)
+        run: cargo test --workspace -- --nocapture
+
+      - name: Run Headless Application Smoke Check
+        env:
+          WARP_HEADLESS_CHECK: "1"
+        run: cargo run -p warp-app
+
+      - name: Verify Linux Packaging Script Dry-Run (Linux Only)
+        if: runner.os == 'Linux'
+        run: |
+          chmod +x scripts/package-linux.sh
+          ./scripts/package-linux.sh --version 0.1.0-ci
+          ls -lh dist/linux/

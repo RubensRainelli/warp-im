@@ -1,0 +1,17 @@
+[package]
+name = "warp-storage"
+version.workspace = true
+edition.workspace = true
+license-file.workspace = true
+authors.workspace = true
+
+[dependencies]
+warp-core.workspace = true
+rusqlite.workspace = true
+tokio.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+compact_str.workspace = true
+async-trait.workspace = true
+thiserror.workspace = true
+tracing.workspace = true

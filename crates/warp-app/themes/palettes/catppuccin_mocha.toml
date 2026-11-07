@@ -1,0 +1,22 @@
+id = "catppuccin_mocha"
+name = "Catppuccin Mocha"
+font_family = "JetBrains Mono"
+font_size_base = 14
+font_size_small = 11
+
+bg_primary = "#1E1E2E"
+bg_secondary = "#181825"
+bg_tertiary = "#11111B"
+bg_elevated = "#313244"
+bubble_outgoing = "#45475A"
+bubble_incoming = "#313244"
+text_primary = "#CDD6F4"
+text_secondary = "#A6ADC8"
+text_muted = "#6C7086"
+accent_primary = "#CBA6F7"
+accent_secondary = "#89B4FA"
+border_subtle = "#313244"
+status_online = "#A6E3A1"
+status_warning = "#F9E2AF"
+status_danger = "#F38BA8"
+surface_opacity = 0.98

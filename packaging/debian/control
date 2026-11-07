@@ -1,0 +1,20 @@
+Package: warp-im
+Version: {{VERSION}}
+Section: net
+Priority: optional
+Architecture: {{ARCH}}
+Depends: libc6 (>= 2.31), libgcc-s1 (>= 3.0), libstdc++6 (>= 5)
+Maintainer: Rubens Rainelli <rubens@rainelli.it>
+Homepage: https://github.com/RubensRainelli/warp-im
+Description: Universal Native Multi-Protocol Messenger (PEFL v1.0)
+ Warp IM is an ultra-low-memory (< 50 MB RAM), GPU-accelerated native
+ messenger written in Rust and Slint unifying 8 messaging protocols:
+ Telegram (MTProto), Matrix (Megolm), XMPP (OMEMO), Nostr (NIP-17),
+ SimpleX Chat (SMP), IRCv3 (Soju/Ergo), Stoat, and Mattermost.
+ .
+ Features hot-swappable SuperThemes (Telegram, WhatsApp, Discord, IRC Dense),
+ 6 color palettes (Light, Dark, OLED Pure Black, Night Telegram, Discord Dark,
+ Catppuccin Mocha), multi-account per protocol, and 4 chat list isolation modes.
+ .
+ Licensed under the Personal and Educational Free License v1.0 (PEFL v1.0).
+ Copyright (c) 2026 Rubens Rainelli.

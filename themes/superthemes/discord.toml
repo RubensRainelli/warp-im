@@ -1,0 +1,19 @@
+# Personal and Educational Free License (PEF License / PEFL)
+# Version 1.0 - 2026-05-26
+# Copyright (c) 2026 Rubens Rainelli
+
+id = "discord"
+name = "Discord / Mattermost Server Rail"
+description = "Left vertical Server/Workspace rail with active squircle pills and categorized channel tree, paired with full-width flat message rows."
+
+navigation_layout = "VerticalServerRail"
+message_layout = "FlatFullWidthRows"
+reaction_style = "BelowMessagePills"
+
+enable_swipe_to_reply = false
+show_protocol_badge = true
+compact_timestamps = true
+sidebar_width_px = 260
+server_rail_width_px = 68
+bubble_corner_radius_px = 6
+avatar_size_px = 36

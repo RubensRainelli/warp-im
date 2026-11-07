@@ -1,0 +1,28 @@
+# Personal and Educational Free License (PEF License / PEFL)
+# Version 1.0 - 2026-05-26
+# Copyright (c) 2026 Rubens Rainelli
+
+id = "dark"
+name = "🌙 Scuro (Dark Slate)"
+font_family = "Inter"
+font_size_base = 14
+font_size_small = 11
+
+bg_primary = "#0E1621"
+bg_secondary = "#17212B"
+bg_tertiary = "#202B36"
+bg_elevated = "#242F3D"
+bubble_outgoing = "#2B5278"
+bubble_incoming = "#182533"
+text_primary = "#F5F5F5"
+text_secondary = "#8A9AA9"
+text_muted = "#5E7185"
+accent_primary = "#5288C1"
+accent_secondary = "#3E6EA2"
+border_subtle = "#101924"
+status_online = "#4ECC5E"
+status_warning = "#F5A623"
+status_danger = "#E53935"
+surface_opacity = 1.0
+is_light_mode = false
+is_oled_mode = false
